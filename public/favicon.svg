@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="VetSirio">
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1FB79F" />
+      <stop offset="1" stop-color="#0B8271" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#fondo)" />
+  <g fill="#FFFFFF">
+    <ellipse cx="19" cy="27" rx="6.2" ry="7.4" transform="rotate(-18 19 27)" />
+    <ellipse cx="27.6" cy="20.6" rx="6.2" ry="7.4" transform="rotate(-6 27.6 20.6)" />
+    <ellipse cx="36.4" cy="20.6" rx="6.2" ry="7.4" transform="rotate(6 36.4 20.6)" />
+    <ellipse cx="45" cy="27" rx="6.2" ry="7.4" transform="rotate(18 45 27)" />
+    <path d="M32 48c-7.3 0-12.7-4-12.7-9.7 0-4.4 3.4-7.5 7.7-7.5 2.1 0 4 .8 5 2.2 1-1.4 2.9-2.2 5-2.2 4.3 0 7.7 3.1 7.7 7.5C44.7 44 39.3 48 32 48z" />
+  </g>
+</svg>

@@ -1,0 +1,387 @@
+/*
+ * Estilos globales mínimos.
+ *
+ * Chakra v3 genera las utilidades y los tokens por CSS variables, así que acá
+ * sólo queda lo que Chakra no puede expresar: reset tipográfico y el
+ * comportamiento del scroll en móvil.
+ */
+
+:root {
+  color-scheme: light;
+
+  /*
+   * Se declara el font-size raíz en píxeles, no en rem, a propósito: con el
+   * 100% por defecto un usuario que suba el tamaño de fuente del navegador
+   * recibe una interfaz que se rompe en vez de una que se adapta.
+   */
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Los inputs heredan la tipografía: sin esto se ve la fuente del navegador. */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/*
+ * Los campos numéricos usan cifras tabulares por defecto: alinea los dígitos
+ * en columna, que es justo lo que hace legible una tabla de montos.
+ */
+input[type="number"],
+input[inputmode="numeric"],
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* El spinner nativo estorba en los campos de monto con máscara. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Scrollbar discreto: sin esto, Windows muestra una barra gruesa que rompe la
+   percepción de "interfaz cuidada". */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--chakra-colors-ink-300) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--chakra-colors-ink-300);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--chakra-colors-ink-400);
+  background-clip: content-box;
+}
+
+/* En pantallas táctiles el scroll horizontal accidental daña el layout. */
+@media (pointer: coarse) {
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* ==========================================================================
+   Controles de formulario
+   ==========================================================================
+   El reset de Chakra deja los controles de texto sin borde y sin fondo, y
+   `chakra.input` no recupera ninguno de los dos: no lleva receta propia, así
+   que un `<chakra.input />` a secas no genera ninguna clase y queda
+   transparente. Se comprobó en el navegador: los campos no tenían ni borde ni
+   fondo, sólo el placeholder.
+
+   Estos estilos son la línea de base. Cualquier componente los sobrescribe con
+   props, porque la regla de Chakra gana por especificidad de clase, así que
+   `borderColor="danger.500"` sigue funcionando.
+
+   Se dejan fuera checkbox, radio, range y color: no son campos de texto y un
+   borde de 1px los deformaría. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+textarea,
+select {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--chakra-colors-ink-200);
+  border-radius: var(--chakra-radii-md);
+  background-color: #ffffff;
+  color: var(--chakra-colors-ink-900);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--chakra-colors-ink-400);
+}
+
+/* El foco se marca con el color de marca y no con el outline del navegador: el
+   genérico es gris y en un campo con borde gris no se distingue del estado
+   normal. */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--chakra-colors-brand-500);
+  box-shadow: 0 0 0 1px var(--chakra-colors-brand-500);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background-color: var(--chakra-colors-ink-50);
+  color: var(--chakra-colors-ink-500);
+  cursor: not-allowed;
+}
+
+/* Respeta la preferencia de menos movimiento del sistema operativo. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Foco visible sólo por teclado: el mouse no debe dejar rastro de focus ring
+   en cada clic. */
+:focus-visible {
+  outline: 2px solid var(--chakra-colors-brand-500);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   Animaciones
+   ==========================================================================
+   Se definen en CSS y no con estilos en línea porque así corren en el
+   compositor: una animación hecha con @keyframes no vuelve a pasar por el
+   hilo de JavaScript en cada cuadro, que es lo que produce el tirón cuando
+   una animación se programa con setInterval. */
+
+/* Cursor de terminal: bloque macizo que parpadea. Se usa un bloque y no un
+   palito porque el palito pasa desapercibido sobre fondo oscuro. */
+@keyframes vetsirio-cursor {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Deriva lenta de los orbes de fondo. 18 segundos porque a velocidad normal
+   el ojo lo percibe como movimiento continuo y termina por ignorarlo; con un
+   ciclo más corto llama la atención y distrae de lo que importa. */
+@keyframes vetsirio-deriva {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(3%, -4%, 0) scale(1.06);
+  }
+  66% {
+    transform: translate3d(-3%, 3%, 0) scale(0.96);
+  }
+}
+
+/* Entrada escalonada de las tarjetas de beneficios. */
+@keyframes vetsirio-entrada {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes vetsirio-entrada-panel {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Onda suave del indicador "en vivo" del panel. */
+@keyframes vetsirio-pulso {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.82);
+  }
+}
+
+/* Til de requisito cumplido: entra con un rebote corto. Se usa en el
+   indicador de contraseña del registro; el tamaño chico pide una animación
+   breve, si dura más se siente lenta. */
+@keyframes vetsirio-check {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* ==========================================================================
+   Animaciones de la pantalla de carga del login
+   ==========================================================================
+   Todas usan transform y opacity, que el compositor resuelve sin recalcular
+   layout. Animar width, height o margin sí fuerza recálculo y produce tirón
+   en equipos modestos, que es justo donde más se nota la lentitud del login. */
+
+/* Aparición de la capa. */
+@keyframes vetsirio-aparece {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Latido cardiaco: dos golpes por ciclo, como un pulso real. */
+/*
+ * Latido de la huella.
+ *
+ * Sólo escala. El centrado por `translate(-50%, -50%)` no va aquí a propósito:
+ * si el keyframe lo llevara, la animación pisaría el `transform` de posicionamiento
+ * y la huella se correría medio ancho a la izquierda. El centrado va en una
+ * caja envolvente en el componente; así la misma animación sirve tanto para la
+ * huella absoluta del login como para un ítem de flex normal en el cierre de
+ * sesión.
+ *
+ * El doble pulso a 28 % y 42 % imita un latido real: systole y diastole, en vez
+ * de un rebote único.
+ */
+@keyframes vetsirio-latido {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.12);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.07);
+  }
+  56% {
+    transform: scale(1);
+  }
+}
+
+/* Onda que se expande y se desvanece, como la de un monitor. */
+@keyframes vetsirio-onda {
+  0% {
+    transform: translate(-50%, -50%) scale(0.65);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.1);
+    opacity: 0;
+  }
+}
+
+/*
+ * Trazo del ECG.
+ *
+ * pathLength=1 normaliza el largo del trazo a 1, así que el offset se mide de
+ * 0 a 1 y no hay que calcular la longitud real de la curva. El trazo se dibuja
+ * de punta a punta, mantiene, se borra y vuelve a empezar: parece un monitor
+ * cardiaco en movimiento.
+ */
+@keyframes vetsirio-ecg {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0.25;
+  }
+  35% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  65% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: -1;
+    opacity: 0.25;
+  }
+}
+
+/*
+ * Cortina de cierre de sesión.
+ *
+ * Se despliega desde arriba con scaleY en vez de animar height: cualquier
+ * propiedad de caja obliga al navegador a recalcular la posición de todo lo que
+ * hay debajo en cada cuadro. scaleY se resuelve en el compositor y además no
+ * provoca el reordenamiento por subpíxel que produce un alto fraccionario.
+ *
+ * El retardo de 140 ms en la cortina es deliberado: deja ver un instante la
+ * pantalla que se está cerrando antes de taparla, que es lo que da la
+ * sensación de "va hacia" en lugar de "se apagó de golpe".
+ */
+@keyframes vetsirio-cortina {
+  0% {
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+  100% {
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+}
+
+/* Barra de progreso indeterminate del cierre de sesión. */
+@keyframes vetsirio-barra {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(240%);
+  }
+}
