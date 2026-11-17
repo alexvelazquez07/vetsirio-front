@@ -58,6 +58,15 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Prefijo de la URL donde se sirve el build.
+ *
+ * Vite lo expone en BASE_URL: "/vetsirio/" en producción (ver `base` en
+ * vite.config.ts) y "/" en desarrollo. React Router necesita la forma sin barra
+ * final, o `undefined` cuando la app vive en la raíz.
+ */
+const BASENAME = import.meta.env.BASE_URL.replace(/\/+$/, "") || undefined;
+
 export default function App() {
   return (
     <ChakraProvider value={system}>
@@ -69,7 +78,7 @@ export default function App() {
           intentaba visitar. Con el Router afuera, useNavigate revienta con
           "may be used only in the context of a <Router> component".
         */}
-        <BrowserRouter>
+        <BrowserRouter basename={BASENAME}>
           <ProveedorAuth>
             <Routes>
               {/* â”€â”€ PÃºblico â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
