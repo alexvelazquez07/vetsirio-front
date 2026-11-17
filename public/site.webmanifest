@@ -3,14 +3,14 @@
   "short_name": "VetSirio",
   "description": "Gestión veterinaria: pacientes, ventas, caja, stock y facturación.",
   "lang": "es",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#F7F9FA",
   "theme_color": "#0D9E87",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "favicon.svg",
       "type": "image/svg+xml",
       "sizes": "any",
       "purpose": "any"

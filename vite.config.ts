@@ -10,7 +10,14 @@ import { defineConfig } from "vite";
  * tsconfig.json: si los dos no coinciden, el editor resuelve una ruta y el
  * bundler otra.
  */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // En producción el front se sirve en https://signiasoft.com/vetsirio/.
+  // Vite necesita saberlo para reescribir los assets de index.html
+  // (`/assets/...` -> `/vetsirio/assets/...`); sin esto el navegador pide los
+  // archivos en la raíz del dominio y da 404.
+  // En desarrollo queda en "/" para no cambiar `npm run dev`.
+  base: mode === "production" ? "/vetsirio/" : "/",
+
   plugins: [react()],
 
   resolve: {
@@ -63,4 +70,4 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 900,
   },
-});
+}));

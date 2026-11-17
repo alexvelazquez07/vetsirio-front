@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  Center,
   chakra,
   Container,
   Flex,
