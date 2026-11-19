@@ -6,12 +6,12 @@ import {
   PanelLeftOpen,
   Search,
 } from "lucide-react";
-import { useState, type ComponentProps, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 import { PopoverContent, PopoverRoot, PopoverTrigger } from "@/components/ui/popover";
-import { useAuth } from "@/features/auth/auth.store";
 import { MENU } from "@/routes/menu";
+import { BuscadorGlobal } from "./BuscadorGlobal";
 import { MenuUsuario } from "./MenuUsuario";
 import { NotificacionesMenu } from "./NotificacionesMenu";
 
@@ -41,8 +41,39 @@ export function TopBar({
   onToggleColapsar,
 }: TopBarProps) {
   const ubicacion = useLocation();
+  const [buscadorAbierto, setBuscadorAbierto] = useState(false);
 
   const titulo = obtenerTitulo(ubicacion.pathname);
+
+  // Ctrl/Cmd + K y "/" abren el buscador. "/" se ignora mientras se escribe en
+  // un campo: ahí la barra es un carácter, no un atajo. El diálogo sólo se
+  // monta al abrirse, así el árbol cerrado no consulta la API ni pide un
+  // QueryClient en las pruebas de la barra.
+  useEffect(() => {
+    const alPresionar = (evento: KeyboardEvent) => {
+      const objetivo = evento.target;
+      const escribiendo =
+        objetivo instanceof HTMLElement &&
+        (objetivo.tagName === "INPUT" ||
+          objetivo.tagName === "TEXTAREA" ||
+          objetivo.tagName === "SELECT" ||
+          objetivo.isContentEditable);
+
+      if ((evento.ctrlKey || evento.metaKey) && evento.key.toLowerCase() === "k") {
+        evento.preventDefault();
+        setBuscadorAbierto(true);
+        return;
+      }
+
+      if (evento.key === "/" && !escribiendo) {
+        evento.preventDefault();
+        setBuscadorAbierto(true);
+      }
+    };
+
+    window.addEventListener("keydown", alPresionar);
+    return () => window.removeEventListener("keydown", alPresionar);
+  }, []);
 
   return (
     <Flex
@@ -96,7 +127,51 @@ export function TopBar({
       </Box>
 
       <Flex align="center" gap="1" flexShrink={0}>
-        <BuscadorRapido />
+        <chakra.button
+          type="button"
+          onClick={() => setBuscadorAbierto(true)}
+          aria-label="Buscar mascotas y módulos"
+          title="Buscar mascotas y módulos (Ctrl+K)"
+          aria-keyshortcuts="Control+K"
+          display="flex"
+          alignItems="center"
+          justifyContent={{ base: "center", md: "flex-start" }}
+          gap="2"
+          w={{ base: "10", md: "auto" }}
+          h="10"
+          px={{ base: "0", md: "3" }}
+          borderRadius="lg"
+          color="ink.500"
+          bg="ink.50"
+          borderWidth="1px"
+          borderColor="ink.200"
+          cursor="pointer"
+          transition="background 0.15s ease, border-color 0.15s ease, color 0.15s ease"
+          _hover={{ bg: "ink.100", color: "ink.800", borderColor: "ink.300" }}
+          _focusVisible={{
+            outline: "2px solid",
+            outlineColor: "brand.500",
+            outlineOffset: "2px",
+          }}>
+          <Search size={17} />
+          <Text fontSize="sm" display={{ base: "none", md: "block" }}>
+            Buscar…
+          </Text>
+          <chakra.kbd
+            display={{ base: "none", lg: "block" }}
+            ml="2"
+            px="1.5"
+            py="0.5"
+            borderRadius="sm"
+            bg="white"
+            borderWidth="1px"
+            borderColor="ink.200"
+            fontFamily="mono"
+            fontSize="xs"
+            color="ink.500">
+            /
+          </chakra.kbd>
+        </chakra.button>
 
         <NotificacionesMenu />
 
@@ -148,6 +223,13 @@ export function TopBar({
 
       {/* El aviso de trial vive en <BannerTrial>, montado en AppShell. No se
           duplica acá para que haya un solo lugar que lo controla. */}
+
+      {buscadorAbierto && (
+        <BuscadorGlobal
+          abierto={buscadorAbierto}
+          onCerrar={() => setBuscadorAbierto(false)}
+        />
+      )}
     </Flex>
   );
 }
@@ -197,144 +279,6 @@ function BotonNavegacion({
       _motionReduce={{ transition: "none", transform: "none" }}>
       {children}
     </chakra.button>
-  );
-}
-
-/**
- * Botón de búsqueda.
- *
- * Abre un diálogo con todos los módulos filtrables. Se implementa como
- * popover simple: una dependencia de "command palette" no aporta tanto como
- * cuesta, y con 20 ítems un buscador con foco y flechas alcanza y sobra.
- */
-function BuscadorRapido() {
-  return (
-    <PopoverRoot positioning={{ placement: "bottom-end" }}>
-      <PopoverTrigger asChild>
-        <chakra.button
-          as="button"
-          type="button"
-          alignItems="center"
-          gap="2"
-          display={{ base: "none", md: "flex" }}
-          h="10"
-          px="3"
-          borderRadius="md"
-          color="ink.500"
-          bg="ink.50"
-          borderWidth="1px"
-          borderColor="ink.200"
-          _hover={{ bg: "ink.100", color: "ink.800", borderColor: "ink.300" }}>
-          <Search size={16} />
-          <Text fontSize="sm">Buscar…</Text>
-          <Text
-            fontSize="xs"
-            px="1.5"
-            py="0.5"
-            borderRadius="sm"
-            bg="white"
-            borderWidth="1px"
-            borderColor="ink.200"
-            ml="2"
-          >
-            /
-          </Text>
-        </chakra.button>
-      </PopoverTrigger>
-
-      <PopoverContent bg="white" borderColor="ink.200" boxShadow="xl" p="0" w="22rem">
-        <BuscadorModulos />
-      </PopoverContent>
-    </PopoverRoot>
-  );
-}
-
-
-function BuscadorModulos() {
-  const navegar = useNavigate();
-  const { puede } = useAuth();
-  const [termino, setTermo] = useState("");
-
-  const filtrados = MENU.flatMap((grupo) =>
-    grupo.items
-      .filter((item) => {
-        if (item.permiso === "__superadmin__") return false;
-        return !item.permiso || puede(item.permiso);
-      })
-      .filter((item) =>
-        item.etiqueta.toLowerCase().includes(termino.toLowerCase()),
-      )
-      .map((item) => ({ ...item, grupo: grupo.etiqueta })),
-  );
-
-  return (
-    <Box>
-      <Flex align="center" gap="2" px="3" py="2.5" borderBottomWidth="1px" borderColor="ink.200">
-        <Search size={16} color="var(--chakra-colors-ink-400)" />
-        <chakra.input
-          autoFocus
-          placeholder="Buscar un módulo…"
-          value={termino}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTermo(e.target.value)}
-          border="none"
-          outline="none"
-          w="full"
-          fontSize="sm"
-          color="ink.900"
-          _placeholder={{ color: "ink.400" }}
-        />
-      </Flex>
-
-      <Box maxH="18rem" overflowY="auto" p="2">
-        {filtrados.length === 0 ? (
-          <Text p="3" fontSize="sm" color="ink.500" textAlign="center">
-            Ningún módulo coincide con «{termino}».
-          </Text>
-        ) : (
-          filtrados.map((item) => {
-            const Icono = item.icono;
-
-            return (
-              <chakra.button
-                key={item.ruta}
-                as="button"
-                type="button"
-                w="full"
-                alignItems="center"
-                gap="2.5"
-                px="2.5"
-                py="2"
-                borderRadius="md"
-                _hover={{ bg: "ink.50" }}
-                onClick={() => navegar(item.ruta)}
-                textAlign="left">
-                <Flex
-                  align="center"
-                  justify="center"
-                  w="7"
-                  h="7"
-                  borderRadius="md"
-                  bg="brand.subtle"
-                  color="brand.fg"
-                  flexShrink={0}
-                >
-                  <Icono size={15} />
-                </Flex>
-
-                <Box minW={0} flex="1">
-                  <Text fontSize="sm" fontWeight="medium" color="ink.900" truncate>
-                    {item.etiqueta}
-                  </Text>
-                  <Text fontSize="xs" color="ink.500">
-                    {item.grupo}
-                  </Text>
-                </Box>
-              </chakra.button>
-            );
-          })
-        )}
-      </Box>
-    </Box>
   );
 }
 

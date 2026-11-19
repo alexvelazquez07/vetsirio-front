@@ -234,6 +234,27 @@ select:disabled {
   }
 }
 
+/* La ficha 360 entra con un leve acercamiento desde el centro. No se desliza
+   desde un borde porque no reemplaza una pantalla anterior: se posa encima de
+   la que ya estaba abierta. */
+@keyframes vetsirio-ficha {
+  from {
+    opacity: 0;
+    transform: scale(0.975) translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+/* Giro del indicador mientras el buscador global consulta la API. */
+@keyframes vetsirio-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Onda suave del indicador "en vivo" del panel. */
 @keyframes vetsirio-pulso {
   0%,
