@@ -202,6 +202,131 @@ export interface Paciente {
   >;
 }
 
+/** Contacto completo del responsable, tal como lo devuelve la ficha 360. */
+export interface ClienteResumen {
+  id: number;
+  documento: string;
+  nombres: string | null;
+  apellidos: string | null;
+  razonSocial: string | null;
+  telefono: string | null;
+  whatsapp: string | null;
+  email?: string | null;
+  direccion?: string | null;
+  ciudad?: string | null;
+}
+
+export interface PacienteFicha extends Omit<Paciente, "cliente"> {
+  microchipUrl: string | null;
+  creadoEn: string;
+  cliente?: ClienteResumen;
+}
+
+export interface FichaConsulta {
+  id: number;
+  fecha: string;
+  estado: EstadoConsulta;
+  motivoConsulta: string;
+  sintomas: string | null;
+  diagnostico: string | null;
+  tratamientoIndicado: string | null;
+  pesoKg: string | number | null;
+  temperatura: string | number | null;
+  frecuenciaCardiaca: number | null;
+  frecuenciaRespiratoria: number | null;
+  veterinario: Pick<Usuario, "id" | "nombre" | "apellido" | "especialidad">;
+}
+
+export interface FichaVacunacion {
+  id: number;
+  nombreVacuna: string;
+  lote: string | null;
+  fechaAplicacion: string;
+  fechaProxima: string | null;
+  via: string | null;
+  loteVenceEn: string | null;
+  certificadoUrl: string | null;
+  aplicadaPor: Pick<Usuario, "id" | "nombre" | "apellido"> | null;
+}
+
+export interface FichaTratamientoDosis {
+  id: number;
+  numeroDosis: number;
+  cantidad: string | number;
+  unidad: string;
+  fechaProgramada: string;
+  fechaAplicada: string | null;
+  administrada: boolean;
+  observaciones: string | null;
+  producto: { id: number; nombre: string } | null;
+}
+
+export interface FichaTratamiento {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  fechaInicio: string;
+  fechaFinPrevista: string | null;
+  fechaFinReal: string | null;
+  activo: boolean;
+  notas: string | null;
+  veterinario: Pick<Usuario, "id" | "nombre" | "apellido" | "especialidad">;
+  dosis: FichaTratamientoDosis[];
+}
+
+export interface FichaCita {
+  id: number;
+  fechaInicio: string;
+  fechaFin: string;
+  estado: string;
+  motivo: string;
+  notas: string | null;
+  motivoCita: { id: number; nombre: string; color: string } | null;
+  veterinario: Pick<
+    Usuario,
+    "id" | "nombre" | "apellido" | "especialidad" | "colorAgenda"
+  > | null;
+}
+
+export interface FichaGrooming {
+  id: number;
+  fechaInicio: string;
+  fechaFin: string | null;
+  tipoServicio: string | null;
+  estado: string;
+  precio: string | number;
+  observaciones: string | null;
+  fotoAntesUrl: string | null;
+  fotoDespuesUrl: string | null;
+  peluquero: Pick<Usuario, "id" | "nombre" | "apellido"> | null;
+}
+
+export interface ResumenFichaPaciente {
+  totalConsultas: number;
+  totalVacunaciones: number;
+  totalTratamientos: number;
+  tratamientosActivos: number;
+  totalCitas: number;
+  totalGrooming: number;
+  ultimaConsulta: string | null;
+  proximaCita: FichaCita | null;
+  proximaVacuna: FichaVacunacion | null;
+  ultimoPeso: { pesoKg: string | number; fecha: string } | null;
+  actividad: { mes: string; consultas: number }[];
+}
+
+/** Respuesta agregada de `GET /pacientes/:id/ficha`. */
+export interface FichaPaciente {
+  paciente: PacienteFicha;
+  resumen: ResumenFichaPaciente;
+  consultas: FichaConsulta[];
+  vacunaciones: FichaVacunacion[];
+  tratamientos: FichaTratamiento[];
+  proximasCitas: FichaCita[];
+  ultimasCitas: FichaCita[];
+  grooming: FichaGrooming[];
+}
+
 export type EstadoConsulta = "abierta" | "en_curso" | "finalizada" | "anulada";
 
 export interface ArchivoConsulta {
