@@ -374,7 +374,7 @@ function FilaPaciente({
       onClick={onElegir}
       onMouseEnter={onSenalar}
       ariaLabel={`Abrir ficha de ${paciente.nombre}`}>
-      <Avatar.Root size="md" colorPalette="brand" flexShrink={0}>
+      <Avatar.Root size="lg" colorPalette="brand" flexShrink={0}>
         {foto && <Avatar.Image src={foto} alt="" />}
         <Avatar.Fallback>
           <PawPrint size={18} />
@@ -539,7 +539,7 @@ function CargandoResultados() {
     <Flex direction="column" gap="1" p="1" aria-label="Cargando resultados">
       {Array.from({ length: 4 }).map((_, indice) => (
         <Flex key={indice} align="center" gap="3" px="2.5" py="2">
-          <Skeleton boxSize="9" borderRadius="full" />
+          <Skeleton boxSize="12" borderRadius="full" />
           <Box flex="1">
             <Skeleton h="3.5" w={`${55 + indice * 8}%`} mb="1.5" />
             <Skeleton h="3" w="40%" />
