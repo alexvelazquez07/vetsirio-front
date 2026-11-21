@@ -70,8 +70,6 @@ interface Props {
   onVolver: () => void;
 }
 
-const TAMANO_AVATAR = { base: "xl", md: "2xl" } as const;
-
 export function FichaPaciente({ pacienteId, onVolver }: Props) {
   const consulta = usePacienteFicha(pacienteId);
 
@@ -155,7 +153,7 @@ function FichaContenido({
           gap={{ base: "4", md: "5" }}
         >
           <Avatar.Root
-            size={TAMANO_AVATAR}
+            boxSize={{ base: "28", md: "32" }}
             colorPalette="brand"
             borderWidth="4px"
             borderColor="whiteAlpha.700"
@@ -164,7 +162,7 @@ function FichaContenido({
           >
             {foto && <Avatar.Image src={foto} alt={`Foto de ${paciente.nombre}`} />}
             <Avatar.Fallback bg="whiteAlpha.300" color="white">
-              <PawPrint size={44} />
+              <PawPrint size={52} />
             </Avatar.Fallback>
           </Avatar.Root>
 
@@ -1185,7 +1183,7 @@ function FichaCargando({ onVolver }: { onVolver: () => void }) {
           <Skeleton h="6" w="16rem" />
         </Flex>
         <Flex gap="4" mt="5" align="center">
-          <Skeleton boxSize="20" borderRadius="full" />
+          <Skeleton boxSize={{ base: "28", md: "32" }} borderRadius="full" />
           <Box flex="1">
             <Skeleton h="7" w="14rem" mb="3" />
             <Skeleton h="4" w="22rem" />
