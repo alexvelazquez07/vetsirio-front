@@ -24,6 +24,8 @@ export interface MoneyInputProps {
   autoFocus?: boolean;
   name?: string;
   id?: string;
+  /** Nombre accesible cuando no hay label visible. */
+  ariaLabel?: string;
   /** Muestra el total formateado con símbolo bajo el campo. */
   mostrarTotal?: boolean;
   /** Símbolo de la moneda. Guaraní por defecto. */
@@ -94,6 +96,7 @@ export function MoneyInput({
   autoFocus,
   name,
   id,
+  ariaLabel,
   mostrarTotal,
   simbolo = SIMBOLO_GS,
   decimales = 0,
@@ -188,6 +191,7 @@ export function MoneyInput({
         <Input
           id={inputId}
           name={name}
+          aria-label={ariaLabel}
           ref={inputRef}
           value={valorVisible}
           onChange={manejarCambio}

@@ -10,21 +10,25 @@ import {
   NativeSelect,
   Spinner,
   Stack,
+  Table,
   Tabs,
   Text,
   Textarea,
   chakra,
 } from "@chakra-ui/react";
 import {
+  AlertTriangle,
   BadgeCheck,
   Barcode,
   Beaker,
   Boxes,
   Camera,
+  Clock,
   FlaskConical,
   ImagePlus,
   Package,
   Pill,
+  Plus,
   ShieldAlert,
   Tag,
   Trash2,
@@ -68,8 +72,18 @@ import {
   UNIDADES_MEDIDA,
   estadoStockProducto,
   type ProductoFormData,
+  type ProductoPrecioPayload,
   type ProveedorProducto,
 } from "./products.service";
+import {
+  estadoPrecio,
+  fechaHoyCalendario,
+  montoVigente,
+  nuevoPrecio,
+  precioDesdeProducto,
+  soloFecha,
+  type PrecioFormulario,
+} from "./precios";
 
 export interface ProductoFormValues {
   codigo: string;
@@ -92,8 +106,7 @@ export interface ProductoFormValues {
   esControlado: boolean;
   requiereReceta: boolean;
   requiereLote: boolean;
-  precioVenta: number | null;
-  precioCosto: number | null;
+  precios: PrecioFormulario[];
   porcentajeIva: string;
   stockMinimo: string;
   fotoUrl: string;
@@ -132,13 +145,46 @@ const VALORES_INICIALES: ProductoFormValues = {
   esControlado: false,
   requiereReceta: false,
   requiereLote: true,
-  precioVenta: 0,
-  precioCosto: 0,
+  precios: [],
   porcentajeIva: "5",
   stockMinimo: "0",
   fotoUrl: "",
   activo: true,
 };
+
+function valoresIniciales(): ProductoFormValues {
+  return {
+    ...VALORES_INICIALES,
+    precios: [nuevoPrecio("venta"), nuevoPrecio("compra")],
+  };
+}
+
+/**
+ * Historial editable del producto. Si todavía no tiene precios con vigencia
+ * (producto viejo o creado antes de la migración) se usa el precio denormalizado
+ * como primera vigencia abierta.
+ */
+function preciosDeProducto(producto: Producto): PrecioFormulario[] {
+  const guardados = (producto.precios ?? [])
+    .map(precioDesdeProducto)
+    .sort((a, b) => b.vigenteDesde.localeCompare(a.vigenteDesde));
+
+  if (guardados.length > 0) return guardados;
+
+  const desde = soloFecha(producto.creadoEn) || fechaHoyCalendario();
+  const filas: PrecioFormulario[] = [];
+  const venta = Number(producto.precioVenta) || 0;
+  const costo = Number(producto.precioCosto) || 0;
+
+  if (venta > 0) {
+    filas.push({ ...nuevoPrecio("venta"), monto: venta, vigenteDesde: desde });
+  }
+  if (costo > 0) {
+    filas.push({ ...nuevoPrecio("compra"), monto: costo, vigenteDesde: desde });
+  }
+
+  return filas;
+}
 
 const TIPOS_FOTO = new Set([
   "image/jpeg",
@@ -192,8 +238,7 @@ const TAB_POR_CAMPO: Record<keyof ProductoFormValues, TabProducto> = {
   presentacion: "clinica",
   especieDestino: "clinica",
   registroSenacsa: "clinica",
-  precioVenta: "precios",
-  precioCosto: "precios",
+  precios: "precios",
   porcentajeIva: "precios",
   unidadMedida: "precios",
   stockMinimo: "inventario",
@@ -216,8 +261,6 @@ const ID_POR_CAMPO: Partial<Record<keyof ProductoFormValues, string>> = {
   presentacion: "producto-presentacion",
   especieDestino: "producto-especie",
   registroSenacsa: "producto-senacsa",
-  precioCosto: "producto-costo",
-  precioVenta: "producto-venta",
   porcentajeIva: "producto-iva",
   unidadMedida: "producto-unidad",
   stockMinimo: "producto-stock-minimo",
@@ -616,9 +659,9 @@ function VistaPrevia({
     stockActual,
     stockMinimo: minimo,
   });
-  const precio = valores.precioVenta ?? 0;
-  const costo = valores.precioCosto ?? 0;
-  const margen = costo > 0 ? ((precio - costo) / costo) * 100 : null;
+  const precio = montoVigente(valores.precios, "venta");
+  const costo = montoVigente(valores.precios, "compra");
+  const margen = precio > 0 && costo > 0 ? ((precio - costo) / costo) * 100 : null;
 
   return (
     <Box
@@ -675,7 +718,7 @@ function VistaPrevia({
             color="ink.900"
             fontVariantNumeric="tabular-nums"
           >
-            {formatMoneda(precio)}
+            {precio > 0 ? formatMoneda(precio) : "Sin precio"}
           </Text>
         </Box>
         <Badge
@@ -716,6 +759,222 @@ function VistaPrevia({
   );
 }
 
+function GrillaPrecios({
+  tipo,
+  titulo,
+  descripcion,
+  precios,
+  errores,
+  onAgregar,
+  onCambiar,
+  onQuitar,
+}: {
+  tipo: "venta" | "compra";
+  titulo: string;
+  descripcion: string;
+  precios: PrecioFormulario[];
+  errores: Record<string, string>;
+  onAgregar: () => void;
+  onCambiar: (key: string, cambios: Partial<PrecioFormulario>) => void;
+  onQuitar: (key: string) => void;
+}) {
+  const hoy = fechaHoyCalendario();
+  const vigentes = precios.filter(
+    (precio) => precio.monto !== null && estadoPrecio(precio, hoy) === "vigente",
+  );
+  const superpuestos = vigentes.length > 1;
+  const sinVigente =
+    tipo === "venta" && montoVigente(precios, "venta", hoy) <= 0;
+
+  const etiquetas: Record<string, { texto: string; color: string }> = {
+    vigente: { texto: "Vigente", color: "green" },
+    programado: { texto: "Programado", color: "blue" },
+    vencido: { texto: "Vencido", color: "red" },
+    sin_fecha: { texto: "Sin fecha", color: "gray" },
+    pendiente: { texto: "Pendiente", color: "gray" },
+  };
+
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="ink.200"
+      borderRadius="xl"
+      bg="white"
+      overflow="hidden"
+    >
+      <Flex
+        align={{ base: "flex-start", sm: "center" }}
+        justify="space-between"
+        gap="3"
+        wrap="wrap"
+        px="4"
+        py="3"
+        borderBottomWidth="1px"
+        borderColor="ink.100"
+      >
+        <Box minW="0">
+          <Text fontSize="sm" fontWeight="semibold" color="ink.900">
+            {titulo}
+          </Text>
+          <Text fontSize="xs" color="ink.500" mt="0.5">
+            {descripcion}
+          </Text>
+        </Box>
+        <Button type="button" size="xs" variant="outline" onClick={onAgregar}>
+          <Plus size={14} />
+          Agregar
+        </Button>
+      </Flex>
+
+      {sinVigente && (
+        <Flex
+          align="flex-start"
+          gap="2"
+          px="4"
+          py="2.5"
+          bg="orange.50"
+          borderBottomWidth="1px"
+          borderColor="orange.100"
+        >
+          <AlertTriangle
+            size={15}
+            color="var(--chakra-colors-orange-600)"
+            style={{ flexShrink: 0, marginTop: 1 }}
+          />
+          <Text fontSize="xs" color="orange.800">
+            Sin precio de venta vigente: este producto no se podrá facturar
+            hasta que cargues uno con la fecha de hoy.
+          </Text>
+        </Flex>
+      )}
+
+      {superpuestos && (
+        <Flex
+          align="flex-start"
+          gap="2"
+          px="4"
+          py="2.5"
+          bg="blue.50"
+          borderBottomWidth="1px"
+          borderColor="blue.100"
+        >
+          <Clock
+            size={15}
+            color="var(--chakra-colors-blue-600)"
+            style={{ flexShrink: 0, marginTop: 1 }}
+          />
+          <Text fontSize="xs" color="blue.800">
+            Hay vigencias superpuestas. Al facturar se toma la de inicio más
+            reciente.
+          </Text>
+        </Flex>
+      )}
+
+      {precios.length === 0 ? (
+        <Box px="4" py="4">
+          <Text fontSize="xs" color="ink.500">
+            Todavía no cargaste precios de {tipo === "venta" ? "venta" : "compra"}.
+          </Text>
+        </Box>
+      ) : (
+        <Table.ScrollArea>
+          <Table.Root size="sm">
+            <Table.Header>
+              <Table.Row bg="ink.50">
+                <Table.ColumnHeader>Precio</Table.ColumnHeader>
+                <Table.ColumnHeader>Vigente desde</Table.ColumnHeader>
+                <Table.ColumnHeader>Vigente hasta</Table.ColumnHeader>
+                <Table.ColumnHeader>Estado</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="right">
+                  Acciones
+                </Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {precios.map((fila) => {
+                const estado =
+                  fila.monto === null
+                    ? "pendiente"
+                    : estadoPrecio(fila, hoy);
+                const etiqueta = etiquetas[estado] ?? etiquetas.pendiente;
+
+                return (
+                  <Table.Row key={fila.key} verticalAlign="top">
+                    <Table.Cell minW="11rem">
+                      <MoneyInput
+                        id={`precio-${fila.key}`}
+                        value={fila.monto}
+                        onChange={(valor) =>
+                          onCambiar(fila.key, { monto: valor })
+                        }
+                        placeholder="0"
+                        errorText={errores[fila.key]}
+                        ariaLabel={`Precio de ${tipo} desde ${
+                          fila.vigenteDesde || "sin fecha"
+                        }`}
+                      />
+                    </Table.Cell>
+                    <Table.Cell minW="10rem">
+                      <Input
+                        type="date"
+                        size="sm"
+                        value={fila.vigenteDesde}
+                        onChange={(evento) =>
+                          onCambiar(fila.key, {
+                            vigenteDesde: evento.target.value,
+                          })
+                        }
+                        aria-label={`Inicio de vigencia del precio de ${tipo}`}
+                      />
+                    </Table.Cell>
+                    <Table.Cell minW="10rem">
+                      <Input
+                        type="date"
+                        size="sm"
+                        value={fila.vigenteHasta}
+                        min={fila.vigenteDesde || undefined}
+                        onChange={(evento) =>
+                          onCambiar(fila.key, {
+                            vigenteHasta: evento.target.value,
+                          })
+                        }
+                        aria-label={`Fin de vigencia del precio de ${tipo}`}
+                      />
+                    </Table.Cell>
+                    <Table.Cell whiteSpace="nowrap">
+                      <Badge
+                        colorPalette={etiqueta.color}
+                        variant="subtle"
+                        size="sm"
+                      >
+                        {etiqueta.texto}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell textAlign="right">
+                      <chakra.button
+                        type="button"
+                        onClick={() => onQuitar(fila.key)}
+                        p="1.5"
+                        borderRadius="md"
+                        color="ink.500"
+                        _hover={{ bg: "danger.subtle", color: "danger.600" }}
+                        aria-label={`Quitar precio de ${tipo}`}
+                        title="Quitar"
+                      >
+                        <Trash2 size={16} />
+                      </chakra.button>
+                    </Table.Cell>
+                  </Table.Row>
+                );
+              })}
+            </Table.Body>
+          </Table.Root>
+        </Table.ScrollArea>
+      )}
+    </Box>
+  );
+}
+
 export function ProductoForm({
   producto,
   categorias = [],
@@ -724,8 +983,13 @@ export function ProductoForm({
   errorGeneral,
   erroresServidor,
 }: ProductoFormProps) {
-  const [valores, setValores] = useState<ProductoFormValues>(VALORES_INICIALES);
+  const [valores, setValores] = useState<ProductoFormValues>(() =>
+    valoresIniciales(),
+  );
   const [errores, setErrores] = useState<Errores>({});
+  const [erroresPrecios, setErroresPrecios] = useState<Record<string, string>>(
+    {},
+  );
   const [proveedorAbierto, setProveedorAbierto] = useState(false);
   const [tabActivo, setTabActivo] = useState<TabProducto>("general");
   const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false);
@@ -742,8 +1006,9 @@ export function ProductoForm({
     setVerFoto(false);
 
     if (!producto) {
-      setValores(VALORES_INICIALES);
+      setValores(valoresIniciales());
       setErrores({});
+      setErroresPrecios({});
       return;
     }
 
@@ -768,14 +1033,14 @@ export function ProductoForm({
       esControlado: producto.esControlado ?? false,
       requiereReceta: producto.requiereReceta ?? false,
       requiereLote: producto.requiereLote ?? true,
-      precioVenta: Number(producto.precioVenta) || 0,
-      precioCosto: Number(producto.precioCosto) || 0,
+      precios: preciosDeProducto(producto),
       porcentajeIva: String(producto.porcentajeIva ?? 5),
       stockMinimo: numeroATexto(producto.stockMinimo),
       fotoUrl: producto.fotoUrl ?? "",
       activo: producto.activo ?? true,
     });
     setErrores({});
+    setErroresPrecios({});
   }, [producto]);
 
   function cambiar<K extends keyof ProductoFormValues>(
@@ -784,6 +1049,40 @@ export function ProductoForm({
   ) {
     setValores((previo) => ({ ...previo, [campo]: nuevo }));
     setErrores((previo) => ({ ...previo, [campo]: undefined }));
+  }
+
+  function cambiarPrecio(key: string, cambios: Partial<PrecioFormulario>) {
+    setValores((previo) => ({
+      ...previo,
+      precios: previo.precios.map((precio) =>
+        precio.key === key ? { ...precio, ...cambios } : precio,
+      ),
+    }));
+    setErroresPrecios((previo) => {
+      if (!previo[key]) return previo;
+      const copia = { ...previo };
+      delete copia[key];
+      return copia;
+    });
+  }
+
+  function agregarPrecio(tipo: "venta" | "compra") {
+    setValores((previo) => ({
+      ...previo,
+      precios: [nuevoPrecio(tipo), ...previo.precios],
+    }));
+  }
+
+  function quitarPrecio(key: string) {
+    setValores((previo) => ({
+      ...previo,
+      precios: previo.precios.filter((precio) => precio.key !== key),
+    }));
+    setErroresPrecios((previo) => {
+      const copia = { ...previo };
+      delete copia[key];
+      return copia;
+    });
   }
 
   function enfocarCampo(campo: keyof ProductoFormValues) {
@@ -804,17 +1103,57 @@ export function ProductoForm({
 
   function validar(): boolean {
     const nuevos: Errores = {};
+    const erroresFilas: Record<string, string> = {};
+    const vistos = new Set<string>();
+    const hoy = fechaHoyCalendario();
+
+    for (const fila of valores.precios) {
+      const filaVacia =
+        fila.monto === null &&
+        !fila.id &&
+        !fila.vigenteHasta &&
+        fila.vigenteDesde === hoy;
+
+      if (filaVacia) continue;
+
+      if (fila.monto === null) {
+        erroresFilas[fila.key] = "Cargá el monto o quitá la fila.";
+        continue;
+      }
+
+      if (fila.monto <= 0) {
+        erroresFilas[fila.key] = "El precio debe ser mayor que cero.";
+        continue;
+      }
+
+      if (!fila.vigenteDesde) {
+        erroresFilas[fila.key] = "Indicá desde cuándo rige el precio.";
+        continue;
+      }
+
+      if (fila.vigenteHasta && fila.vigenteHasta < fila.vigenteDesde) {
+        erroresFilas[fila.key] =
+          "El fin de vigencia no puede ser anterior al inicio.";
+        continue;
+      }
+
+      const clave = `${fila.tipo}|${fila.vigenteDesde}`;
+      if (vistos.has(clave)) {
+        erroresFilas[fila.key] =
+          "Ya hay un precio de este tipo con la misma fecha de inicio.";
+        continue;
+      }
+      vistos.add(clave);
+    }
+
+    if (Object.keys(erroresFilas).length > 0) {
+      nuevos.precios = "Revisá los precios marcados.";
+    }
 
     if (valores.nombre.trim().length < 2) {
       nuevos.nombre = "Escribí al menos 2 caracteres.";
     }
 
-    if ((valores.precioVenta ?? 0) < 0) {
-      nuevos.precioVenta = "El precio no puede ser negativo.";
-    }
-    if ((valores.precioCosto ?? 0) < 0) {
-      nuevos.precioCosto = "El costo no puede ser negativo.";
-    }
     if (aNumero(valores.stockMinimo) < 0) {
       nuevos.stockMinimo = "El stock mínimo no puede ser negativo.";
     }
@@ -829,12 +1168,31 @@ export function ProductoForm({
       enfocarCampo(primerCampo);
     }
 
+    const primerErrorPrecio = Object.keys(erroresFilas)[0];
+    if (primerErrorPrecio) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(`precio-${primerErrorPrecio}`)?.focus();
+      });
+    }
+
     setErrores(nuevos);
+    setErroresPrecios(erroresFilas);
     return camposConError.length === 0;
   }
 
   function enviar() {
     if (!validar()) return;
+
+    const hoy = fechaHoyCalendario();
+    const precios: ProductoPrecioPayload[] = valores.precios
+      .filter((fila) => fila.monto !== null && fila.monto > 0)
+      .map((fila) => ({
+        ...(fila.id ? { id: fila.id } : {}),
+        tipo: fila.tipo,
+        monto: fila.monto as number,
+        vigenteDesde: fila.vigenteDesde,
+        vigenteHasta: fila.vigenteHasta || null,
+      }));
 
     const datos: ProductoFormData = {
       codigo: valores.codigo.trim() || undefined,
@@ -858,12 +1216,13 @@ export function ProductoForm({
       requiereReceta: valores.requiereReceta,
       requiereLote: valores.requiereLote,
       requiereVencimiento: valores.requiereLote,
-      precioVenta: valores.precioVenta ?? 0,
-      precioCosto: valores.precioCosto ?? 0,
+      precioVenta: montoVigente(valores.precios, "venta", hoy),
+      precioCosto: montoVigente(valores.precios, "compra", hoy),
       porcentajeIva: Number(valores.porcentajeIva),
       stockMinimo: aNumero(valores.stockMinimo),
       fotoUrl: valores.fotoUrl,
       activo: valores.activo,
+      precios,
     };
 
     onGuardar(datos);
@@ -934,8 +1293,9 @@ export function ProductoForm({
     setTabActivo(TAB_POR_CAMPO[primerCampo]);
   }, [firmaErroresServidor]);
 
-  const costo = valores.precioCosto ?? 0;
-  const venta = valores.precioVenta ?? 0;
+  const hoy = fechaHoyCalendario();
+  const costo = montoVigente(valores.precios, "compra", hoy);
+  const venta = montoVigente(valores.precios, "venta", hoy);
   const ganancia = venta - costo;
 
   return (
@@ -1107,6 +1467,7 @@ export function ProductoForm({
                       id="producto-codigo"
                       etiqueta="Código interno (SKU)"
                       ayuda="Si lo dejás vacío se genera automáticamente."
+                      requerido
                       error={erroresMostrados.codigo}
                     >
                       <Input
@@ -1429,6 +1790,32 @@ export function ProductoForm({
 
               <Tabs.Content value="precios" pt="0">
                 <Stack gap="4">
+                  <GrillaPrecios
+                    tipo="venta"
+                    titulo="Precios de venta"
+                    descripcion="Al facturar se usa el precio cuya vigencia cubre la fecha de emisión."
+                    precios={valores.precios.filter(
+                      (precio) => precio.tipo === "venta",
+                    )}
+                    errores={erroresPrecios}
+                    onAgregar={() => agregarPrecio("venta")}
+                    onCambiar={cambiarPrecio}
+                    onQuitar={quitarPrecio}
+                  />
+
+                  <GrillaPrecios
+                    tipo="compra"
+                    titulo="Precios de compra"
+                    descripcion="El costo se actualiza con cada compra y queda registrado como una nueva vigencia."
+                    precios={valores.precios.filter(
+                      (precio) => precio.tipo === "compra",
+                    )}
+                    errores={erroresPrecios}
+                    onAgregar={() => agregarPrecio("compra")}
+                    onCambiar={cambiarPrecio}
+                    onQuitar={quitarPrecio}
+                  />
+
                   <Grid
                     templateColumns={{
                       base: "1fr",
@@ -1436,28 +1823,6 @@ export function ProductoForm({
                     }}
                     gap="4"
                   >
-                    <Box>
-                      <MoneyInput
-                        id="producto-costo"
-                        label="Precio de costo"
-                        value={valores.precioCosto}
-                        onChange={(valor) => cambiar("precioCosto", valor)}
-                        placeholder="0"
-                        errorText={erroresMostrados.precioCosto}
-                      />
-                    </Box>
-
-                    <Box>
-                      <MoneyInput
-                        id="producto-venta"
-                        label="Precio de venta"
-                        value={valores.precioVenta}
-                        onChange={(valor) => cambiar("precioVenta", valor)}
-                        placeholder="0"
-                        errorText={erroresMostrados.precioVenta}
-                      />
-                    </Box>
-
                     <Campo id="producto-iva" etiqueta="IVA">
                       <NativeSelect.Root>
                         <NativeSelect.Field
@@ -1526,14 +1891,18 @@ export function ProductoForm({
                               fontWeight="semibold"
                               color="ink.900"
                             >
-                              {ganancia >= 0
-                                ? "Ganancia por unidad"
-                                : "Vendés por debajo del costo"}
+                              {venta <= 0
+                                ? "Sin precio de venta vigente"
+                                : ganancia >= 0
+                                  ? "Ganancia por unidad"
+                                  : "Vendés por debajo del costo"}
                             </Text>
                             <Text fontSize="xs" color="ink.600" mt="0.5">
-                              {costo > 0
-                                ? `Margen de ${(((venta - costo) / costo) * 100).toFixed(1)} % sobre el costo`
-                                : "Cargá el costo para calcular el margen."}
+                              {venta <= 0
+                                ? "Cargá un precio de venta con la fecha de hoy para poder facturar."
+                                : costo > 0
+                                  ? `Margen de ${(((venta - costo) / costo) * 100).toFixed(1)} % sobre el costo`
+                                  : "Cargá el costo para calcular el margen."}
                             </Text>
                           </Box>
                         </Flex>
@@ -1543,7 +1912,7 @@ export function ProductoForm({
                           color={ganancia >= 0 ? "success.700" : "danger.700"}
                           fontVariantNumeric="tabular-nums"
                         >
-                          {formatMoneda(ganancia)}
+                          {venta <= 0 ? "—" : formatMoneda(ganancia)}
                         </Text>
                       </Flex>
                     </Box>
