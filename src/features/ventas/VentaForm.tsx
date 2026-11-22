@@ -51,6 +51,7 @@ import {
   useCategoriasProducto,
   useCrearProducto,
 } from "@/features/products/products.service";
+import { montoVigente } from "@/features/products/precios";
 import {
   formatCantidad,
   formatFecha,
@@ -191,18 +192,36 @@ function productoSinStock(producto: Producto): boolean {
   return stock !== null && stock <= 0;
 }
 
+/**
+ * Precio de venta que corresponde a la fecha de emisión. Si el producto no
+ * tiene historial (venta vieja o respuesta reducida) se usa el denormalizado.
+ */
+function precioVentaVigente(producto: Producto, fecha: string): number {
+  if (producto.precios && producto.precios.length > 0) {
+    return montoVigente(producto.precios, "venta", fecha);
+  }
+  return Number(producto.precioVenta) || 0;
+}
+
+function productoSinPrecio(producto: Producto, fecha: string): boolean {
+  return precioVentaVigente(producto, fecha) <= 0;
+}
+
 function nombreDeLinea(linea: LineaFormularioVenta): string {
   return linea.producto?.nombre ?? linea.servicio?.nombre ?? "ítem";
 }
 
-function lineaDesdeProducto(producto: Producto): LineaFormularioVenta {
+function lineaDesdeProducto(
+  producto: Producto,
+  fechaEmision: string,
+): LineaFormularioVenta {
   return {
     ...nuevaLinea(),
     producto,
     servicio: null,
     codigoSku: producto.codigo,
     porcentajeIva: ivaDeNumero(producto.porcentajeIva, 5),
-    precioUnitario: producto.precioVenta?.toString() ?? "",
+    precioUnitario: String(precioVentaVigente(producto, fechaEmision)),
     descripcion: producto.nombre,
   };
 }
@@ -503,6 +522,7 @@ function BuscadorItemsModal({
   abierto,
   busquedaInicial,
   tipoInicial,
+  fechaEmision,
   onCerrar,
   onSeleccionarProducto,
   onSeleccionarServicio,
@@ -510,6 +530,7 @@ function BuscadorItemsModal({
   abierto: boolean;
   busquedaInicial: string;
   tipoInicial: TipoCatalogo;
+  fechaEmision: string;
   onCerrar: () => void;
   onSeleccionarProducto: (producto: Producto) => void;
   onSeleccionarServicio: (servicio: Servicio) => void;
@@ -541,6 +562,13 @@ function BuscadorItemsModal({
       toaster.error({
         title: "Sin stock disponible",
         description: `«${producto.nombre}» no tiene unidades para vender.`,
+      });
+      return;
+    }
+    if (productoSinPrecio(producto, fechaEmision)) {
+      toaster.error({
+        title: "Sin precio de venta vigente",
+        description: `«${producto.nombre}» no tiene precio vigente al ${formatFechaCalendario(fechaEmision)}. Cargalo en Productos → Precios.`,
       });
       return;
     }
@@ -657,14 +685,22 @@ function BuscadorItemsModal({
               productos.map((producto, indice) => {
                 const activo = indice === indiceSeguro;
                 const sinStock = productoSinStock(producto);
+                const sinPrecio = productoSinPrecio(producto, fechaEmision);
+                const noVendible = sinStock || sinPrecio;
                 return (
                   <chakra.button
                     key={producto.id}
                     type="button"
                     role="option"
                     aria-selected={activo}
-                    aria-disabled={sinStock}
-                    title={sinStock ? "Sin stock disponible" : undefined}
+                    aria-disabled={noVendible}
+                    title={
+                      sinStock
+                        ? "Sin stock disponible"
+                        : sinPrecio
+                          ? "Sin precio de venta vigente"
+                          : undefined
+                    }
                     tabIndex={-1}
                     w="full"
                     textAlign="left"
@@ -672,8 +708,8 @@ function BuscadorItemsModal({
                     py="2"
                     borderRadius="md"
                     bg={activo ? "brand.50" : "transparent"}
-                    opacity={sinStock ? 0.6 : 1}
-                    cursor={sinStock ? "not-allowed" : "pointer"}
+                    opacity={noVendible ? 0.6 : 1}
+                    cursor={noVendible ? "not-allowed" : "pointer"}
                     onMouseDown={(evento: React.MouseEvent) => evento.preventDefault()}
                     onMouseEnter={() => setIndiceActivo(indice)}
                     onClick={() => elegirProducto(producto)}
@@ -697,9 +733,18 @@ function BuscadorItemsModal({
                         <Badge colorPalette={sinStock ? "red" : "gray"} variant="subtle" size="xs">
                           {sinStock ? "Sin stock" : `Stock ${formatCantidad(producto.stockActual)}`}
                         </Badge>
-                        <Text fontSize="xs" fontWeight="medium" color="ink.700">
-                          {formatearMonto("PYG", producto.precioVenta)}
-                        </Text>
+                        {sinPrecio ? (
+                          <Badge colorPalette="orange" variant="subtle" size="xs">
+                            Sin precio
+                          </Badge>
+                        ) : (
+                          <Text fontSize="xs" fontWeight="medium" color="ink.700">
+                            {formatearMonto(
+                              "PYG",
+                              precioVentaVigente(producto, fechaEmision),
+                            )}
+                          </Text>
+                        )}
                       </Flex>
                     </Flex>
                   </chakra.button>
@@ -950,6 +995,7 @@ function FilaVenta({
             onChange={(valor) => onCambiar({ precioUnitario: valor === null ? "" : String(valor) })}
             placeholder="0"
             disabled={!cantidadLlena}
+            readOnly={producto !== null}
             simbolo={moneda === "USD" ? "US$" : undefined}
             decimales={moneda === "USD" ? 2 : 0}
           />
@@ -1118,6 +1164,23 @@ export function VentaForm({
     return soloLectura ? iniciales : completarFilas(iniciales);
   });
 
+  // El precio de un producto siempre es el vigente a la fecha de emisión: al
+  // cambiar la fecha se recalcula. Los servicios conservan su precio editable.
+  useEffect(() => {
+    setLineas((previas) => {
+      let huboCambios = false;
+      const siguientes = previas.map((linea) => {
+        if (!linea.producto) return linea;
+        const precio = precioVentaVigente(linea.producto, fechaEmision);
+        const texto = precio > 0 ? String(precio) : "";
+        if (linea.precioUnitario === texto) return linea;
+        huboCambios = true;
+        return { ...linea, precioUnitario: texto };
+      });
+      return huboCambios ? siguientes : previas;
+    });
+  }, [fechaEmision]);
+
   const [errores, setErrores] = useState<Errores>({});
   const [erroresLineas, setErroresLineas] = useState<Record<string, string>>({});
   const [skuEnCurso, setSkuEnCurso] = useState<string | null>(null);
@@ -1149,6 +1212,7 @@ export function VentaForm({
     presentacion: "",
     unidadMedida: "unidad",
     porcentajeIva: "10",
+    precioVenta: null as number | null,
     categoriaId: null as number | null,
     requiereLote: false,
     requiereVencimiento: false,
@@ -1264,6 +1328,17 @@ export function VentaForm({
       });
       return;
     }
+    if (productoSinPrecio(producto, fechaEmision)) {
+      setErroresLineas((previos) => ({
+        ...previos,
+        [keyDestino ?? primeraVacia ?? ""]: `«${producto.nombre}» no tiene precio de venta vigente al ${formatFechaCalendario(fechaEmision)}.`,
+      }));
+      toaster.error({
+        title: "Sin precio de venta vigente",
+        description: `«${producto.nombre}» no tiene precio vigente al ${formatFechaCalendario(fechaEmision)}. Cargalo en Productos → Precios.`,
+      });
+      return;
+    }
     // Como la tabla ya no pide lote, un mismo producto no puede repetirse.
     const yaExiste = lineas.some((linea) => linea.producto?.id === producto.id);
     if (yaExiste) {
@@ -1273,7 +1348,7 @@ export function VentaForm({
       }));
       return;
     }
-    colocarLinea(lineaDesdeProducto(producto), keyDestino);
+    colocarLinea(lineaDesdeProducto(producto, fechaEmision), keyDestino);
   }
 
   function agregarServicio(servicio: Servicio, keyDestino?: string | null) {
@@ -1425,6 +1500,12 @@ export function VentaForm({
       setErrorAltaProducto("Ingresá el nombre del producto.");
       return;
     }
+    if (!nuevoProducto.precioVenta || nuevoProducto.precioVenta <= 0) {
+      setErrorAltaProducto(
+        "Ingresá un precio de venta mayor a cero para poder facturarlo.",
+      );
+      return;
+    }
 
     try {
       const creado = await crearProducto.mutateAsync({
@@ -1439,8 +1520,16 @@ export function VentaForm({
         requiereReceta: false,
         requiereLote: nuevoProducto.requiereLote,
         requiereVencimiento: nuevoProducto.requiereVencimiento,
-        precioVenta: 0,
+        precioVenta: nuevoProducto.precioVenta,
         precioCosto: 0,
+        precios: [
+          {
+            tipo: "venta",
+            monto: nuevoProducto.precioVenta,
+            vigenteDesde: fechaEmision,
+            vigenteHasta: null,
+          },
+        ],
         stockMinimo: 0,
         proveedorId: null,
         activo: true,
@@ -1453,6 +1542,7 @@ export function VentaForm({
         presentacion: "",
         unidadMedida: "unidad",
         porcentajeIva: "10",
+        precioVenta: null,
         categoriaId: null,
         requiereLote: false,
         requiereVencimiento: false,
@@ -1491,7 +1581,9 @@ export function VentaForm({
       const servicio = linea.servicio;
       let error: string | undefined;
 
-      if (aNumero(linea.cantidad) <= 0) {
+      if (producto && productoSinPrecio(producto, fechaEmision)) {
+        error = `Sin precio de venta vigente al ${formatFechaCalendario(fechaEmision)}.`;
+      } else if (aNumero(linea.cantidad) <= 0) {
         error = "La cantidad debe ser mayor a cero.";
       } else if (linea.precioUnitario.trim() === "") {
         error = "Indicá el precio unitario.";
@@ -1548,7 +1640,7 @@ export function VentaForm({
           productoId: linea.producto.id,
           servicioId: null,
           cantidad: aNumero(linea.cantidad),
-          costoUnitario: aNumero(linea.precioUnitario),
+          costoUnitario: precioVentaVigente(linea.producto, fechaEmision),
           porcentajeIva: linea.porcentajeIva,
           ...(linea.descripcion.trim() ? { descripcion: linea.descripcion.trim() } : {}),
           // Sólo viaja el lote que ya traía una venta pendiente; acá ya no se edita.
@@ -2240,6 +2332,18 @@ export function VentaForm({
                         <NativeSelect.Indicator />
                       </NativeSelect.Root>
                     </Campo>
+                    <Campo etiqueta="Precio de venta" requerido>
+                      <MoneyInput
+                        value={nuevoProducto.precioVenta}
+                        onChange={(valor) =>
+                          setNuevoProducto((previo) => ({
+                            ...previo,
+                            precioVenta: valor,
+                          }))
+                        }
+                        ariaLabel="Precio de venta del producto nuevo"
+                      />
+                    </Campo>
                     <Campo etiqueta="IVA">
                       <NativeSelect.Root size="sm">
                         <NativeSelect.Field
@@ -2467,6 +2571,7 @@ export function VentaForm({
           abierto
           busquedaInicial={busquedaBuscador}
           tipoInicial="producto"
+          fechaEmision={fechaEmision}
           onCerrar={cerrarBuscador}
           onSeleccionarProducto={(producto) => agregarProducto(producto, lineaBuscador)}
           onSeleccionarServicio={(servicio) => agregarServicio(servicio, lineaBuscador)}

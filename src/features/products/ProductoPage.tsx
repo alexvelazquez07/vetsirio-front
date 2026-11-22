@@ -53,6 +53,7 @@ import { formatFecha, formatFechaCalendario, formatMoneda } from "@/lib/formato"
 import { urlDeArchivo } from "@/services/api";
 import type { Producto } from "@/types/dominio";
 import { AjusteStockDialog, type AjusteStockValores } from "./AjusteStockDialog";
+import { montoVigente } from "./precios";
 import { ProductoDetalle } from "./ProductoDetalle";
 import { ProductoForm, type ProductoFormValues } from "./ProductoForm";
 import { VerLotesDialog } from "./VerLotesDialog";
@@ -630,21 +631,41 @@ export function ProductoPage() {
         accessorKey: "precioVenta",
         header: "Precio",
         meta: { align: "right" },
-        cell: ({ row }) => (
-          <Box textAlign="right">
-            <Text
-              fontSize="sm"
-              fontWeight="semibold"
-              color="ink.900"
-              fontVariantNumeric="tabular-nums"
-            >
-              {formatMoneda(row.original.precioVenta)}
-            </Text>
-            <Text fontSize="xs" color="ink.500" mt="0.5">
-              Costo {formatMoneda(row.original.precioCosto)}
-            </Text>
-          </Box>
-        ),
+        cell: ({ row }) => {
+          const producto = row.original;
+          const precio =
+            producto.precios && producto.precios.length > 0
+              ? montoVigente(producto.precios, "venta")
+              : Number(producto.precioVenta) || 0;
+          const costo =
+            producto.precios && producto.precios.length > 0
+              ? montoVigente(producto.precios, "compra")
+              : Number(producto.precioCosto) || 0;
+
+          return (
+            <Box textAlign="right">
+              {precio > 0 ? (
+                <Text
+                  fontSize="sm"
+                  fontWeight="semibold"
+                  color="ink.900"
+                  fontVariantNumeric="tabular-nums"
+                >
+                  {formatMoneda(precio)}
+                </Text>
+              ) : (
+                <Badge colorPalette="orange" variant="subtle" size="sm">
+                  Sin precio vigente
+                </Badge>
+              )}
+              {costo > 0 && (
+                <Text fontSize="xs" color="ink.500" mt="0.5">
+                  Costo {formatMoneda(costo)}
+                </Text>
+              )}
+            </Box>
+          );
+        },
       },
       {
         id: "proveedor",
@@ -1292,8 +1313,7 @@ const CAMPOS_PRODUCTO: (keyof ProductoFormValues)[] = [
   "registroSenacsa",
   "ubicacion",
   "unidadMedida",
-  "precioVenta",
-  "precioCosto",
+  "precios",
   "porcentajeIva",
   "stockMinimo",
   "fotoUrl",

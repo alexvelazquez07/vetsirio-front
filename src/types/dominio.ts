@@ -477,6 +477,19 @@ export interface ProductoLote {
   ubicacion: string | null;
 }
 
+export type TipoPrecioProducto = "venta" | "compra";
+
+/** Precio de un producto con su período de vigencia. */
+export interface ProductoPrecio {
+  id: number;
+  tipo: TipoPrecioProducto;
+  monto: string | number;
+  vigenteDesde: string;
+  vigenteHasta: string | null;
+  creadoEn?: string;
+  actualizadoEn?: string;
+}
+
 /** Lote vencido o próximo a vencer que el listado necesita señalar. */
 export interface LoteAlertaProducto {
   id: number;
@@ -544,6 +557,7 @@ export interface Producto {
   } | null;
   lotes?: ProductoLote[];
   movimientos?: StockMovimiento[];
+  precios?: ProductoPrecio[];
   cantidadLotes?: number;
   lotesPorVencer?: number;
   lotesVencidos?: number;
