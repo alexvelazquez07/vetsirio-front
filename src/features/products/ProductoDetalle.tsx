@@ -44,6 +44,7 @@ import {
 import { urlDeArchivo } from "@/services/api";
 import type { Producto, StockMovimiento } from "@/types/dominio";
 import { estadoLote } from "./lotes";
+import { montoVigente } from "./precios";
 import { estadoStockProducto } from "./products.service";
 
 const ETIQUETAS_MOVIMIENTO: Record<
@@ -166,6 +167,16 @@ export function ProductoDetalle({
 }) {
   const { puede } = useAuth();
   const estado = producto ? estadoStockProducto(producto) : "agotado";
+  const precioVenta = producto
+    ? producto.precios && producto.precios.length > 0
+      ? montoVigente(producto.precios, "venta")
+      : Number(producto.precioVenta) || 0
+    : 0;
+  const precioCosto = producto
+    ? producto.precios && producto.precios.length > 0
+      ? montoVigente(producto.precios, "compra")
+      : Number(producto.precioCosto) || 0
+    : 0;
   const lotes = producto?.lotes ?? [];
   const movimientos = producto?.movimientos ?? [];
 
@@ -322,13 +333,15 @@ export function ProductoDetalle({
                   <Text
                     fontSize="2xl"
                     fontWeight="bold"
-                    color="ink.900"
+                    color={precioVenta > 0 ? "ink.900" : "orange.600"}
                     fontVariantNumeric="tabular-nums"
                   >
-                    {formatMoneda(producto.precioVenta)}
+                    {precioVenta > 0
+                      ? formatMoneda(precioVenta)
+                      : "Sin precio vigente"}
                   </Text>
                   <Text fontSize="xs" color="ink.500" mt="1">
-                    Costo {formatMoneda(producto.precioCosto)} · IVA{" "}
+                    Costo {formatMoneda(precioCosto)} · IVA{" "}
                     {producto.porcentajeIva}%
                   </Text>
                 </TarjetaDato>

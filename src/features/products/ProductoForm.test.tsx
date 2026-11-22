@@ -100,7 +100,7 @@ describe("ProductoForm", () => {
     );
 
     await usuario.click(screen.getByRole("tab", { name: "Precios" }));
-    await usuario.type(screen.getByLabelText(/^Precio de costo/i), "20000");
+    await usuario.type(screen.getByLabelText(/^Precio de compra/i), "20000");
     await usuario.type(screen.getByLabelText(/^Precio de venta/i), "35000");
 
     await usuario.click(screen.getByRole("tab", { name: "Inventario" }));
@@ -123,6 +123,10 @@ describe("ProductoForm", () => {
         nombre: "Ivermectina 1%",
         precioCosto: 20000,
         precioVenta: 35000,
+        precios: expect.arrayContaining([
+          expect.objectContaining({ tipo: "compra", monto: 20000 }),
+          expect.objectContaining({ tipo: "venta", monto: 35000 }),
+        ]),
         stockMinimo: 4,
         esMedicamento: true,
         requiereReceta: true,
@@ -258,6 +262,34 @@ describe("ProductoForm", () => {
     });
     expect(
       await screen.findByText("El stock mínimo no puede ser negativo."),
+    ).toBeInTheDocument();
+    expect(onGuardar).not.toHaveBeenCalled();
+  });
+
+  it("rechaza un precio con vigencia invertida", async () => {
+    const usuario = userEvent.setup();
+    const { onGuardar } = montar();
+
+    await usuario.type(
+      screen.getByLabelText(/^Nombre del producto/i),
+      "Test",
+    );
+    await usuario.click(screen.getByRole("tab", { name: "Precios" }));
+    await usuario.type(screen.getByLabelText(/^Precio de venta/i), "1000");
+
+    fireEvent.change(
+      screen.getByLabelText(/^Inicio de vigencia del precio de venta/i),
+      { target: { value: "2026-05-10" } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(/^Fin de vigencia del precio de venta/i),
+      { target: { value: "2026-05-01" } },
+    );
+
+    guardar();
+
+    expect(
+      await screen.findByText(/fin de vigencia no puede ser anterior/i),
     ).toBeInTheDocument();
     expect(onGuardar).not.toHaveBeenCalled();
   });

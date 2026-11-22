@@ -43,6 +43,14 @@ export interface ProveedorProducto {
   nombreMostrable?: string;
 }
 
+export interface ProductoPrecioPayload {
+  id?: number;
+  tipo: "venta" | "compra";
+  monto: number;
+  vigenteDesde: string;
+  vigenteHasta?: string | null;
+}
+
 export interface ProductoFormData {
   codigo?: string;
   nombre: string;
@@ -71,6 +79,7 @@ export interface ProductoFormData {
   stockMinimo: number;
   fotoUrl?: string | null;
   activo: boolean;
+  precios?: ProductoPrecioPayload[];
 }
 
 export interface CargaInicialStockItem {
