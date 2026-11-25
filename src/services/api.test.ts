@@ -5,6 +5,7 @@ import {
   configurarCallbacksAuth,
   debeIntentarRefresh,
   debeRecargarPagina,
+  esSesionTerminada,
   http,
   ApiError,
 } from "@/services/api";
@@ -123,6 +124,32 @@ describe("debeRecargarPagina", () => {
     for (const caso of casos) {
       expect(debeRecargarPagina(caso)).toBe(false);
     }
+  });
+});
+
+describe("esSesionTerminada", () => {
+  it("cierra la sesión cuando el servidor rechaza el refresh (401/403)", () => {
+    expect(
+      esSesionTerminada(new ApiError("Sesión expirada", 401, "REFRESH_EXPIRADO")),
+    ).toBe(true);
+    expect(
+      esSesionTerminada(new ApiError("Cuenta inactiva", 403, "CUENTA_INACTIVA")),
+    ).toBe(true);
+  });
+
+  it("NO cierra la sesión por un corte de red o un error del servidor", () => {
+    // Expulsar al usuario porque el wifi falló al volver a la pestaña es
+    // justamente el síntoma que se está corrigiendo.
+    expect(
+      esSesionTerminada(new ApiError("Sin conexión", 503, "SIN_CONEXION")),
+    ).toBe(false);
+    expect(esSesionTerminada(new ApiError("Error interno", 500))).toBe(false);
+    expect(esSesionTerminada(new Error("boom"))).toBe(false);
+    expect(esSesionTerminada(undefined)).toBe(false);
+  });
+
+  it("reconoce el error crudo de axios con status 401", () => {
+    expect(esSesionTerminada({ response: { status: 401 } })).toBe(true);
   });
 });
 
