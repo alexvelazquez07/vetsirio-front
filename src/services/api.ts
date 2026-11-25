@@ -113,6 +113,87 @@ async function refrescarToken(): Promise<unknown> {
 }
 
 /**
+ * Nombre del candado que coordina el refresco entre pestañas.
+ *
+ * El refresh token es de un solo uso: si dos pestañas lo presentan a la vez,
+ * la segunda llega con un token ya rotado y el backend —con razón— interpreta
+ * reuso y tumba la familia completa. Ambas terminan deslogueadas. El candado
+ * hace que sólo una pestaña rote; las demás esperan y reintentan con las
+ * cookies nuevas, que el navegador comparte entre pestañas.
+ */
+const NOMBRE_CANDADO_REFRESH = "vetsirio:refresh-sesion";
+
+/**
+ * Ejecuta `tarea` bajo un candado compartido entre pestañas del mismo origen.
+ *
+ * Web Locks existe en todos los navegadores actuales; si falta, se ejecuta sin
+ * candado. Es una mejora de concurrencia, no un requisito para funcionar.
+ */
+async function conCandadoEntrePestanas<T>(tarea: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator === "undefined" ? undefined : navigator.locks;
+
+  if (!locks) {
+    return tarea();
+  }
+
+  return locks.request(NOMBRE_CANDADO_REFRESH, tarea) as Promise<T>;
+}
+
+/** ¿El error es un access token vencido, que sí se puede renovar? */
+function esTokenExpirado(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 401 &&
+    error.code === "TOKEN_EXPIRADO"
+  );
+}
+
+/**
+ * ¿La sesión terminó de verdad?
+ *
+ * Sólo un rechazo explícito del servidor (401/403) cierra la sesión. Un corte
+ * de red, un timeout o un 503 al renovar no son motivo para expulsar al
+ * usuario: se le deja la sesión como estaba y puede reintentar.
+ */
+export function esSesionTerminada(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    return error.status === 401 || error.status === 403;
+  }
+
+  const status = (error as AxiosError | undefined)?.response?.status;
+  return status === 401 || status === 403;
+}
+
+/**
+ * Renueva la sesión y repite la petición original.
+ *
+ * Antes de rotar el refresh se reintenta la petición: si otra pestaña renovó
+ * mientras esperábamos el candado, las cookies ya son nuevas y no hace falta
+ * un segundo refresco.
+ */
+async function renovarSesionYReintentar(
+  original: InternalAxiosRequestConfig,
+): Promise<unknown> {
+  return conCandadoEntrePestanas(async () => {
+    try {
+      return await api(original);
+    } catch (error) {
+      if (!esTokenExpirado(error)) {
+        throw error;
+      }
+    }
+
+    await refrescarToken();
+    return api(original);
+  });
+}
+
+/** Normaliza tanto un error de axios como uno ya normalizado. */
+function normalizarError(error: unknown): ApiError {
+  return error instanceof ApiError ? error : normalizar(error as AxiosError);
+}
+
+/**
  * Rutas que nunca disparan un refresco.
  *
  * Refrescar dentro del refresh crearía un bucle infinito, y un login fallido
@@ -202,14 +283,14 @@ api.interceptors.response.use(
       original._reintentado = true;
 
       try {
-        await refrescarToken();
-        return api(original);
-      } catch {
-        // El refresh falló: la sesión terminó de verdad. Se avisa al store y
-        // el error se propaga; el store elimina los datos privados y navega
-        // al login con el aviso de expiración.
-        alCerrarSesion?.();
-        return Promise.reject(normalizar(error));
+        return await renovarSesionYReintentar(original);
+      } catch (errorRenovacion) {
+        // El refresh falló. Sólo se cierra la sesión si el servidor la rechazó
+        // (401/403); un problema de red no debe sacar al usuario de la app.
+        if (esSesionTerminada(errorRenovacion)) {
+          alCerrarSesion?.();
+        }
+        return Promise.reject(normalizarError(errorRenovacion));
       }
     }
 
