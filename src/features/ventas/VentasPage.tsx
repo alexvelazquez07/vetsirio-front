@@ -255,6 +255,8 @@ export function VentasPage() {
         "Veterinaria",
       razonSocial: datos?.razonSocial,
       ruc: datos?.ruc,
+      actividadEconomica: datos?.actividadEconomica,
+      nombreRepresentante: datos?.nombreRepresentante,
       direccion: datos?.direccion,
       telefono: datos?.telefono,
       email: datos?.email,
