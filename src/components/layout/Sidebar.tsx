@@ -4,6 +4,7 @@ import { ChevronDown, X as XIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
+import isotipo from "@/assets/img/03_isotipo_V_oscuro.png";
 import { DrawerRoot, DrawerBackdrop, DrawerBody, DrawerContent } from "@/components/ui/drawer";
 import { useAuth } from "@/features/auth/auth.store";
 import { MENU, type GrupoMenu } from "@/routes/menu";
@@ -168,39 +169,27 @@ export function Sidebar({ colapsada, onNavegar, mostrarMarca = true }: SidebarPr
   );
 }
 
-/** Logo + nombre del producto y de la veterinaria. */
-function MarcaVetSirio({ colapsada = false }: { colapsada?: boolean }) {
+/** Isotipo de VetSirio, siempre visible. El nombre de la veterinaria va como subtítulo. */
+function MarcaVetSirio({ colapsada = false }: { colapsada?: boolean }) {  
   const { veterinaria } = useAuth();
 
   return (
-    <Flex align="center" gap="3" minW={0} w="full" justify={colapsada ? "center" : "flex-start"}>
-      <Flex
-        align="center"
-        justify="center"
-        w="9"
-        h="9"
+    <Flex
+      align="center"
+      gap="3"
+      minW={0}
+      w="full"
+      justify={colapsada ? "center" : "flex-start"}
+    >
+      <chakra.img
+        src={isotipo}
+        alt="VetSirio"
+        w="10"
+        h="auto"
         flexShrink={0}
-        overflow="hidden"
-        borderRadius="xl"
-        bg={veterinaria?.logoUrl ? "white" : "brand.500"}
-        color="white"
-        fontWeight="bold"
-        fontSize="sm"
-        letterSpacing="0.02em"
-        boxShadow="0 4px 14px color-mix(in srgb, var(--chakra-colors-brand-500) 45%, transparent)"
-      >
-        {veterinaria?.logoUrl ? (
-          <chakra.img
-            src={urlDeArchivo(veterinaria.logoUrl)}
-            alt={`Logo de ${veterinaria.nombreComercial}`}
-            w="full"
-            h="full"
-            objectFit="contain"
-          />
-        ) : (
-          "VS"
-        )}
-      </Flex>
+        draggable={false}
+        userSelect="none"
+      />
 
       {!colapsada && (
         <Box minW={0} flex="1">
@@ -208,7 +197,7 @@ function MarcaVetSirio({ colapsada = false }: { colapsada?: boolean }) {
             VetSirio
           </Text>
           <Text fontSize="xs" color="ink.400" truncate>
-            {veterinaria?.nombreComercial ?? "Gestión veterinaria"}
+            Tu sistema de gestión
           </Text>
         </Box>
       )}

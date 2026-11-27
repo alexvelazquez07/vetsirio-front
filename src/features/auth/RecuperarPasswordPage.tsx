@@ -11,11 +11,12 @@ import {
   VisuallyHidden,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 
+import logoVetSirio from "@/assets/img/02_VetSirio_logo_fondo_blanco.png";
 import { Alert } from "@/components/ui/alert";
 import {
   ProgressCircleRing,
@@ -51,6 +52,10 @@ interface RespuestaVerificacion {
 
 const LONGITUD_CODIGO = 6;
 const MINUTOS_VALIDEZ_POR_DEFECTO = 10;
+
+/** Anillo de foco compartido con la pantalla de acceso. */
+const anilloFoco =
+  "0 0 0 3px color-mix(in srgb, var(--chakra-colors-brand-500) 18%, transparent)";
 
 /**
  * `Date.now` aislado en una función de módulo para que el compilador de React
@@ -232,43 +237,61 @@ export function RecuperarPasswordPage() {
   return (
     <Flex minH="100dvh" bg="ink.50" align="center" py="10" px="5">
       <Container maxW="26rem" p="0">
-        <Flex justify="center" mb="7">
-          <Flex
-            align="center"
-            justify="center"
-            w="11"
-            h="11"
-            borderRadius="lg"
-            bg="brand.500"
-            color="white"
-            fontWeight="bold"
-            fontSize="lg"
-          >
-            VS
-          </Flex>
-        </Flex>
-
         <Box
           bg="white"
-          borderRadius="lg"
+          borderRadius="2xl"
           borderWidth="1px"
           borderColor="ink.200"
-          boxShadow="sm"
-          p={{ base: "6", md: "7" }}
+          px={{ base: "6", md: "8" }}
+          py={{ base: "7", md: "9" }}
         >
+          {/* Logo con fondo blanco: se funde con la tarjeta, que también es
+              blanca. La imagen original es grande, así que se limita el ancho y
+              la altura se calcula sola para no deformarla. */}
+          <chakra.img
+            src={logoVetSirio}
+            alt="VetSirio — gestión veterinaria"
+            display="block"
+            w="full"
+            maxW="21rem"
+            h="auto"
+            mx="auto"
+            mb="7"
+            decoding="async"
+            draggable={false}
+            userSelect="none"
+          />
+
+          {/* Indicador de paso: dos barras finas y el número de paso. */}
+          <Box mb="6" aria-hidden="true">
+            <Flex gap="1.5">
+              <Box flex="1" h="1" borderRadius="full" bg="brand.500" />
+              <Box
+                flex="1"
+                h="1"
+                borderRadius="full"
+                bg={paso === "codigo" ? "brand.500" : "ink.200"}
+                transition="background 200ms ease"
+              />
+            </Flex>
+            <Text fontSize="xs" color="ink.500" mt="2">
+              Paso {paso === "email" ? 1 : 2} de 2
+            </Text>
+          </Box>
+
           {paso === "email" ? (
             <>
               <Heading
                 as="h1"
                 fontSize="xl"
-                fontWeight="bold"
+                fontWeight="semibold"
                 color="ink.900"
                 letterSpacing="-0.02em"
               >
                 Recuperar contraseña
               </Heading>
 
-              <Text color="ink.600" mt="2" mb="6" fontSize="sm">
+              <Text color="ink.500" mt="1.5" mb="6" fontSize="sm" lineHeight="1.6">
                 Ingresá el correo con el que registraste tu veterinaria. Te
                 enviamos un código de 6 dígitos y un enlace para crear una
                 contraseña nueva.
@@ -281,55 +304,45 @@ export function RecuperarPasswordPage() {
               )}
 
               <chakra.form onSubmit={enviar} noValidate>
-                <Box mb="4">
+                <Box mb="5">
                   <chakra.label
                     htmlFor="email"
                     fontSize="sm"
                     fontWeight="medium"
-                    color="ink.800"
+                    color="ink.700"
                     mb="1.5"
                     display="block"
                   >
                     Correo electrónico
                   </chakra.label>
 
-                  <Box position="relative">
-                    <Box
-                      position="absolute"
-                      left="3"
-                      top="50%"
-                      transform="translateY(-50%)"
-                      color={
-                        formState.errors.email ? "danger.500" : "ink.400"
-                      }
-                      pointerEvents="none"
-                      zIndex="1"
-                    >
-                      <Mail size={17} />
-                    </Box>
-
-                    <Input
-                      id="email"
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      placeholder="tu@veterinaria.com"
-                      pl="10"
-                      h="11"
-                      borderColor={
-                        formState.errors.email ? "danger.500" : "ink.200"
-                      }
-                      {...register("email")}
-                    />
-                  </Box>
+                  <Input
+                    id="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoFocus
+                    placeholder="tu@veterinaria.com"
+                    h="11"
+                    borderColor={
+                      formState.errors.email ? "danger.500" : "ink.200"
+                    }
+                    _hover={{
+                      borderColor: formState.errors.email
+                        ? "danger.500"
+                        : "ink.300",
+                    }}
+                    _focusVisible={{
+                      borderColor: formState.errors.email
+                        ? "danger.500"
+                        : "brand.500",
+                      boxShadow: anilloFoco,
+                    }}
+                    {...register("email")}
+                  />
 
                   {formState.errors.email && (
-                    <Text
-                      fontSize="xs"
-                      color="danger.600"
-                      mt="1.5"
-                      fontWeight="medium"
-                    >
+                    <Text fontSize="xs" color="danger.600" mt="1.5">
                       {formState.errors.email.message}
                     </Text>
                   )}
@@ -342,8 +355,10 @@ export function RecuperarPasswordPage() {
                   bg="brand.500"
                   color="white"
                   fontWeight="semibold"
+                  borderRadius="lg"
                   loading={cargando}
                   _hover={{ bg: "brand.600" }}
+                  _active={{ bg: "brand.700" }}
                 >
                   Enviar código
                 </Button>
@@ -371,11 +386,17 @@ export function RecuperarPasswordPage() {
                   <ShieldCheck size={24} />
                 </Flex>
 
-                <Heading as="h1" size="md" fontWeight="bold" color="ink.900">
+                <Heading
+                  as="h1"
+                  fontSize="xl"
+                  fontWeight="semibold"
+                  color="ink.900"
+                  letterSpacing="-0.02em"
+                >
                   Ingresá el código
                 </Heading>
 
-                <Text color="ink.600" mt="2" fontSize="sm" lineHeight="1.6">
+                <Text color="ink.500" mt="1.5" fontSize="sm" lineHeight="1.6">
                   Enviamos un código de 6 dígitos a{" "}
                   <chakra.span fontWeight="semibold" color="ink.800">
                     {enmascararEmail(email)}
@@ -431,7 +452,7 @@ export function RecuperarPasswordPage() {
                 disabled={vencido || verificando}
               >
                 <PinInput.HiddenInput />
-                <PinInput.Control gap="2">
+                <PinInput.Control gap="2" justifyContent="center">
                   {Array.from({ length: LONGITUD_CODIGO }, (_, indice) => (
                     <PinInput.Input
                       key={indice}
@@ -449,10 +470,10 @@ export function RecuperarPasswordPage() {
                             ? "danger.300"
                             : "ink.200"
                       }
+                      _hover={{ borderColor: "ink.300" }}
                       _focusVisible={{
                         borderColor: "brand.500",
-                        boxShadow:
-                          "0 0 0 3px color-mix(in srgb, var(--chakra-colors-brand-500) 22%, transparent)",
+                        boxShadow: anilloFoco,
                       }}
                       aria-label={`Dígito ${indice + 1} de ${LONGITUD_CODIGO}`}
                     />
@@ -480,6 +501,7 @@ export function RecuperarPasswordPage() {
                 bg="brand.500"
                 color="white"
                 fontWeight="semibold"
+                borderRadius="lg"
                 loading={verificando}
                 disabled={!codigoCompleto || vencido}
                 _hover={{ bg: "brand.600" }}
@@ -488,7 +510,7 @@ export function RecuperarPasswordPage() {
                 Verificar código
               </Button>
 
-              <Flex justify="center" align="center" gap="1" mt="3">
+              <Flex justify="center" align="center" gap="1" mt="3" wrap="wrap">
                 <Button
                   type="button"
                   variant="ghost"
@@ -548,7 +570,7 @@ export function RecuperarPasswordPage() {
             gap="2"
             justify="center"
             mt="6"
-            color="ink.600"
+            color="ink.500"
             _hover={{ color: "ink.900" }}
           >
             <ArrowLeft size={16} />
