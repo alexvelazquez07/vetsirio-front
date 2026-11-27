@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 
+import logoVetSirio from "@/assets/img/08_app_icon_192x192.png";
 import { Alert } from "@/components/ui/alert";
 import { guardarEmailRecordado } from "@/features/auth/emailRecordado";
 import { http } from "@/services/api";
@@ -175,24 +176,13 @@ export function RegistroPage() {
               </Flex>
             </Link>
 
-            <Flex align="center" gap="2">
-              <Flex
-                align="center"
-                justify="center"
-                w="8"
-                h="8"
-                borderRadius="md"
-                bg="brand.500"
-                color="white"
-                fontWeight="bold"
-                fontSize="sm"
-              >
-                VS
-              </Flex>
-              <Text fontWeight="bold" color="ink.900">
-                VetSirio
-              </Text>
-            </Flex>
+            <chakra.img
+              src={logoVetSirio}
+              alt="VetSirio"
+              h="12"
+              w="auto"
+              draggable={false}
+            />
           </Flex>
         </Container>
       </Box>
