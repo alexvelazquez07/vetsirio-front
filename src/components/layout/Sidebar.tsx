@@ -8,7 +8,6 @@ import isotipo from "@/assets/img/03_isotipo_V_oscuro.png";
 import { DrawerRoot, DrawerBackdrop, DrawerBody, DrawerContent } from "@/components/ui/drawer";
 import { useAuth } from "@/features/auth/auth.store";
 import { MENU, type GrupoMenu } from "@/routes/menu";
-import { urlDeArchivo } from "@/services/api";
 
 /**
  * Barra lateral de navegación.
@@ -171,7 +170,6 @@ export function Sidebar({ colapsada, onNavegar, mostrarMarca = true }: SidebarPr
 
 /** Isotipo de VetSirio, siempre visible. El nombre de la veterinaria va como subtítulo. */
 function MarcaVetSirio({ colapsada = false }: { colapsada?: boolean }) {  
-  const { veterinaria } = useAuth();
 
   return (
     <Flex
