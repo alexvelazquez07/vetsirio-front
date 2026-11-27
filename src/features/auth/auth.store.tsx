@@ -64,7 +64,6 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   const {
     data: perfil,
     isLoading: cargando,
-    isError,
   } = useQuery({
     queryKey: ["auth", "perfil"],
     queryFn: async (): Promise<RespuestaPerfil | null> => {
@@ -76,7 +75,10 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
         if (error instanceof ApiError && error.status === 401) {
           return null;
         }
-        return null;
+        // Cualquier otro fallo (red, 5xx) no significa que la sesión terminó.
+        // Se relanza para conservar el último perfil conocido en vez de
+        // reemplazarlo por null y expulsar al usuario al login.
+        throw error;
       }
     },
     retry: false,
@@ -210,7 +212,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       veterinaria: perfil?.veterinaria ?? null,
       estadoSuscripcion: perfil?.estadoSuscripcion ?? null,
       cargando,
-      autenticado: Boolean(perfil?.usuario) && !isError,
+      autenticado: Boolean(perfil?.usuario),
       login,
       logout,
       limpiarSesion,
@@ -218,7 +220,7 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
       puede,
       puedeAlguno,
     }),
-    [perfil, cargando, isError, login, logout, limpiarSesion, refrescarPerfil, puede, puedeAlguno],
+    [perfil, cargando, login, logout, limpiarSesion, refrescarPerfil, puede, puedeAlguno],
   );
 
   return <ContextoAuth.Provider value={valor}>{children}</ContextoAuth.Provider>;
