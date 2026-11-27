@@ -14,6 +14,8 @@ export interface TicketOrganizacion {
   nombre: string;
   razonSocial?: string | null;
   ruc?: string | null;
+  actividadEconomica?: string | null;
+  nombreRepresentante?: string | null;
   direccion?: string | null;
   telefono?: string | null;
   email?: string | null;
@@ -27,8 +29,12 @@ export interface TicketOrganizacion {
 
 export interface TicketItemDatos {
   descripcion: string;
+  /** Código del producto o servicio, si lo tiene. */
+  codigo?: string | null;
   cantidad: string | number;
   precioUnitario?: string | number;
+  /** Alícuota de IVA de la línea: 0 (exenta), 5 o 10. */
+  porcentajeIva?: string | number | null;
   total: string | number;
 }
 
@@ -48,7 +54,14 @@ export interface TicketVentaDatos {
   moneda: string;
   condicionPago?: string | null;
   estado?: string | null;
-  cliente?: { nombre?: string | null; documento?: string | null } | null;
+  cliente?: {
+    nombre?: string | null;
+    documento?: string | null;
+    direccion?: string | null;
+    ciudad?: string | null;
+    departamento?: string | null;
+    telefono?: string | null;
+  } | null;
   vendedor?: string | null;
   items: TicketItemDatos[];
   subtotal?: string | number | null;
@@ -90,15 +103,24 @@ export function ticketDesdeVenta(
     condicionPago: venta.condicionPago,
     estado: venta.estado,
     cliente: venta.cliente
-      ? { nombre: nombreCliente, documento: venta.cliente.documento }
+      ? {
+          nombre: nombreCliente,
+          documento: venta.cliente.documento,
+          direccion: venta.cliente.direccion,
+          ciudad: venta.cliente.ciudad,
+          departamento: venta.cliente.departamento,
+          telefono: venta.cliente.telefono,
+        }
       : null,
     vendedor: [venta.usuario?.nombre, venta.usuario?.apellido]
       .filter(Boolean)
       .join(" "),
     items: (venta.items ?? []).map((item) => ({
       descripcion: item.descripcion,
+      codigo: item.codigo,
       cantidad: item.cantidad,
       precioUnitario: item.costoUnitario,
+      porcentajeIva: item.porcentajeIva,
       total: item.total,
     })),
     subtotal: venta.subtotal,
@@ -189,7 +211,7 @@ function construirDocumentoTicket(
   const copias = Math.min(3, Math.max(1, Math.trunc(configuracion.copias)));
   const cuerpo = construirCuerpoTicket(datos, organizacion, configuracion);
   const copiasHtml = Array.from({ length: copias }, () => cuerpo).join(
-    '<div class="tk-corte"></div>',
+    '<div class="tk-corte"><span>✂ cortar</span></div>',
   );
 
   return `<!doctype html>
@@ -210,6 +232,11 @@ function construirDocumentoTicket(
 
 /* ─────────────────────────── Construcción del HTML ─────────────────────────── */
 
+/**
+ * Estilos del ticket. Es 100 % monocromático (negro sobre blanco) para que
+ * salga nítido en impresoras térmicas. La jerarquía se logra con peso de
+ * fuente, tamaño y reglas, nunca con rellenos.
+ */
 export function estilosTicket(configuracion: ConfiguracionImpresion): string {
   const formato = formatoImpresion(configuracion.formato);
   const compacto = configuracion.formato === "ticket_58";
@@ -222,34 +249,60 @@ export function estilosTicket(configuracion: ConfiguracionImpresion): string {
   box-sizing: border-box;
   padding: ${compacto ? "2.5mm 2.5mm 4mm" : "4mm 4mm 5mm"};
   background: #fff;
-  color: #111;
+  color: #000;
   font-family: "Courier New", Consolas, ui-monospace, monospace;
-  font-size: ${compacto ? "8.4pt" : "10.2pt"};
-  line-height: 1.35;
+  font-size: ${compacto ? "8.4pt" : "10pt"};
+  line-height: 1.32;
   overflow: hidden;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 .tk-ticket * { box-sizing: border-box; }
 .tk-centro { text-align: center; }
+
+/* Cabecera del negocio */
 .tk-logo {
   display: block;
   margin: 0 auto ${compacto ? "1.5mm" : "2.5mm"};
   max-width: ${compacto ? "16mm" : "24mm"};
   max-height: ${compacto ? "11mm" : "16mm"};
   object-fit: contain;
-  filter: grayscale(1);
 }
-.tk-negocio { font-size: ${compacto ? "10.5pt" : "12.5pt"}; font-weight: 700; line-height: 1.2; }
-.tk-sub { font-size: ${compacto ? "7.6pt" : "8.6pt"}; color: #333; }
-.tk-sep { border-top: 1px dashed #555; margin: ${compacto ? "1.6mm 0" : "2.2mm 0"}; }
-.tk-titulo {
+.tk-negocio {
+  font-size: ${compacto ? "10.5pt" : "13pt"};
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.8mm;
+}
+.tk-sub { font-size: ${compacto ? "7.4pt" : "8.4pt"}; color: #222; line-height: 1.3; }
+
+/* Separadores */
+.tk-sep { border-top: 1px dashed #000; margin: ${compacto ? "1.8mm 0" : "2.4mm 0"}; }
+.tk-sep-solido { border-top: 1px solid #000; margin: ${compacto ? "1.2mm 0" : "1.6mm 0"}; }
+
+/* Título del comprobante */
+.tk-banda {
+  margin: ${compacto ? "2mm 0 1.6mm" : "2.8mm 0 2mm"};
+  padding: ${compacto ? "1.2mm 0" : "1.6mm 0"};
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
   text-align: center;
-  font-size: ${compacto ? "9.5pt" : "11pt"};
+}
+.tk-titulo {
+  font-size: ${compacto ? "9.4pt" : "11pt"};
+  font-weight: 700;
+  letter-spacing: 0.8px;
+}
+.tk-numero {
+  margin-top: 0.6mm;
+  font-size: ${compacto ? "9.6pt" : "11.5pt"};
   font-weight: 700;
   letter-spacing: 0.4px;
-  margin: 0.5mm 0 1.5mm;
 }
+
+/* Filas etiqueta / valor */
 .tk-fila {
   display: flex;
   justify-content: space-between;
@@ -259,47 +312,117 @@ export function estilosTicket(configuracion: ConfiguracionImpresion): string {
 .tk-fila > span:first-child { flex: 0 0 auto; }
 .tk-fila > span:last-child, .tk-fila > b:last-child { text-align: right; word-break: break-word; }
 .tk-etiqueta { font-weight: 700; }
-.tk-items { margin-top: 1mm; }
-.tk-item { margin-bottom: ${compacto ? "1.2mm" : "1.8mm"}; }
-.tk-item-linea { display: flex; align-items: flex-start; gap: 1.2mm; }
-.tk-item-cant { flex: 0 0 auto; min-width: 6mm; color: #333; }
-.tk-item-desc { flex: 1 1 auto; min-width: 0; word-break: break-word; }
-.tk-item-total { flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; }
-.tk-item-sub { padding-left: 7.2mm; font-size: ${compacto ? "7.2pt" : "8pt"}; color: #555; }
+.tk-seccion {
+  font-size: ${compacto ? "7.2pt" : "8pt"};
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 0.6mm;
+}
+
+/* Ítems */
+.tk-cabecera-items {
+  display: flex;
+  justify-content: space-between;
+  padding: ${compacto ? "0.8mm 0" : "1mm 0"};
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  font-size: ${compacto ? "7.2pt" : "8pt"};
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+.tk-items { margin-top: ${compacto ? "1.2mm" : "1.6mm"}; }
+.tk-item {
+  padding-bottom: ${compacto ? "1mm" : "1.4mm"};
+  margin-bottom: ${compacto ? "1mm" : "1.4mm"};
+  border-bottom: 1px dotted #777;
+}
+.tk-item:last-child { border-bottom: 0; margin-bottom: 0; }
+.tk-item-cod {
+  font-size: ${compacto ? "7.2pt" : "8pt"};
+  letter-spacing: 0.4px;
+  color: #222;
+  word-break: break-all;
+}
+.tk-item-desc { font-weight: 700; word-break: break-word; }
+.tk-item-linea {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2mm;
+  font-size: ${compacto ? "8pt" : "9pt"};
+}
+.tk-item-calculo { color: #222; min-width: 0; word-break: break-word; }
+.tk-item-total {
+  flex: 0 0 auto;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tk-tasa {
+  font-weight: 400;
+  font-size: ${compacto ? "6.8pt" : "7.4pt"};
+  margin-left: 1mm;
+}
+.tk-resumen-items {
+  margin-top: ${compacto ? "1mm" : "1.4mm"};
+  font-size: ${compacto ? "7.4pt" : "8.2pt"};
+  color: #222;
+}
+
+/* Totales */
 .tk-totales { margin-top: 0.5mm; }
 .tk-total-final {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 2mm;
-  margin-top: 1.2mm;
-  padding-top: 1.2mm;
-  border-top: 1px solid #111;
-  font-size: ${compacto ? "10.5pt" : "12pt"};
+  margin-top: ${compacto ? "1.6mm" : "2.2mm"};
+  padding: ${compacto ? "1.4mm 1.8mm" : "1.8mm 2.4mm"};
+  border: 1.5px solid #000;
+  outline: 0.5px solid #000;
+  outline-offset: 1px;
+  font-size: ${compacto ? "10.6pt" : "12.5pt"};
   font-weight: 700;
 }
+.tk-liquidacion { margin-top: ${compacto ? "2mm" : "2.8mm"}; font-size: ${compacto ? "7.6pt" : "8.6pt"}; }
+
+/* Pie */
 .tk-pie {
-  margin-top: ${compacto ? "2mm" : "3mm"};
+  margin-top: ${compacto ? "2.2mm" : "3mm"};
   text-align: center;
   font-size: ${compacto ? "7.8pt" : "8.8pt"};
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
 }
-.tk-nota { text-align: center; font-size: ${compacto ? "7pt" : "7.8pt"}; color: #444; margin-top: 1.2mm; }
+.tk-nota {
+  text-align: center;
+  font-size: ${compacto ? "6.8pt" : "7.6pt"};
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  margin-top: 1.6mm;
+}
 .tk-anulada {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(180, 35, 24, 0.28);
+  color: rgba(0, 0, 0, 0.18);
   font-size: ${compacto ? "26pt" : "34pt"};
   font-weight: 800;
   letter-spacing: 2px;
   transform: rotate(-24deg);
   pointer-events: none;
 }
-.tk-corte { border-top: 1px dashed #777; margin: 3mm 0; }
+.tk-corte {
+  border-top: 1px dashed #000;
+  margin: 3mm 0;
+  text-align: center;
+  font-size: 7pt;
+  line-height: 0;
+}
+.tk-corte span { background: #fff; padding: 0 2mm; position: relative; top: -0.1mm; }
 `;
 }
 
@@ -314,6 +437,7 @@ export function construirCuerpoTicket(
 
   filas.push('<div class="tk-ticket">');
 
+  /* ── Cabecera del negocio ── */
   if (configuracion.mostrarLogo && organizacion.logoUrl) {
     filas.push(
       `<img class="tk-logo" src="${escaparHtml(organizacion.logoUrl)}" alt="" />`,
@@ -328,9 +452,17 @@ export function construirCuerpoTicket(
     filas.push(`<div class="tk-centro tk-sub">${escaparHtml(linea)}</div>`);
   }
 
-  filas.push('<div class="tk-sep"></div>');
+  /* ── Título y número del comprobante ── */
+  filas.push('<div class="tk-banda">');
   filas.push(`<div class="tk-titulo">${escaparHtml(titulo)}</div>`);
+  if (configuracion.mostrarDatosFiscales && datos.numeroComprobante) {
+    filas.push(
+      `<div class="tk-numero">N° ${escaparHtml(datos.numeroComprobante)}</div>`,
+    );
+  }
+  filas.push("</div>");
 
+  /* ── Datos del comprobante ── */
   if (configuracion.mostrarDatosFiscales) {
     if (datos.timbrado) {
       filas.push(fila("Timbrado:", datos.timbrado));
@@ -344,88 +476,104 @@ export function construirCuerpoTicket(
       }
     }
 
-  filas.push(
-    fila("Comprobante: ", datos.numeroComprobante),
-    fila(
-      "Fecha Emisión: ",
-      `${formatFechaCalendario(datos.fechaEmision)} ${formatHora(datos.fechaEmision)}`,
-    ),
-  );
-   /* if (datos.establecimiento || datos.puntoExpedicion) {
-      filas.push(
-        fila(
-          "Establecimiento",
-          `${datos.establecimiento ?? "001"}-${datos.puntoExpedicion ?? "001"}`,
-        ),
-      );
-    }*/
+    filas.push(
+      fila(
+        "Fecha:",
+        `${formatFechaCalendario(datos.fechaEmision)} ${formatHora(datos.fechaEmision)}`,
+      ),
+    );
   }
 
   if (datos.condicionPago) {
     filas.push(
       fila(
-        "Condición",
+        "Condición:",
         datos.condicionPago === "credito" ? "Crédito" : "Contado",
       ),
     );
   }
 
   if (configuracion.mostrarVendedor && datos.vendedor) {
-    filas.push(fila("Vendedor", datos.vendedor));
+    filas.push(fila("Vendedor:", datos.vendedor));
   }
 
+  /* ── Cliente ── */
   if (configuracion.mostrarCliente && datos.cliente) {
     filas.push('<div class="tk-sep"></div>');
+    filas.push('<div class="tk-seccion">CLIENTE</div>');
     if (datos.cliente.nombre) {
-      filas.push(fila("Cliente: ", datos.cliente.nombre));
+      filas.push(fila("Nombre:", datos.cliente.nombre));
     }
     if (configuracion.mostrarDocumentoCliente && datos.cliente.documento) {
-      filas.push(fila("R.U.C / C.I : ", datos.cliente.documento));
+      filas.push(fila("RUC / C.I.:", datos.cliente.documento));
+    }
+    const direccionCliente = unirCliente([
+      datos.cliente.direccion,
+      datos.cliente.ciudad,
+      datos.cliente.departamento,
+    ]);
+    if (direccionCliente) {
+      filas.push(fila("Dirección:", direccionCliente));
+    }
+    if (datos.cliente.telefono) {
+      filas.push(fila("Teléfono:", datos.cliente.telefono));
     }
   }
 
+  /* ── Ítems ── */
   filas.push('<div class="tk-sep"></div>');
+  filas.push(
+    '<div class="tk-cabecera-items"><span>DESCRIPCIÓN</span><span>IMPORTE</span></div>',
+  );
   filas.push('<div class="tk-items">');
+
+  let unidades = 0;
 
   for (const item of datos.items) {
     const cantidad = Number(item.cantidad) || 1;
     const unitario = item.precioUnitario ?? (Number(item.total) || 0) / cantidad;
+    const codigo = String(item.codigo ?? "").trim();
+    const tasa = tasaItem(item, datos);
+    unidades += Number(item.cantidad) || 0;
 
     filas.push('<div class="tk-item">');
+
+    // El código va arriba de la descripción para localizarlo rápido.
+    if (codigo) {
+      filas.push(`<div class="tk-item-cod">Cód: ${escaparHtml(codigo)}</div>`);
+    }
+
+    filas.push(`<div class="tk-item-desc">${escaparHtml(item.descripcion)}</div>`);
+
     filas.push('<div class="tk-item-linea">');
     filas.push(
-      `<span class="tk-item-cant">${escaparHtml(formatCantidad(item.cantidad))}×</span>`,
+      `<span class="tk-item-calculo">${escaparHtml(formatCantidad(item.cantidad))} x ${escaparHtml(dinero(datos.moneda, unitario))}</span>`,
     );
     filas.push(
-      `<span class="tk-item-desc">${escaparHtml(item.descripcion)}</span>`,
-    );
-    filas.push(
-      `<span class="tk-item-total">${escaparHtml(dinero(datos.moneda, item.total))}</span>`,
+      `<span class="tk-item-total">${escaparHtml(dinero(datos.moneda, item.total))}<span class="tk-tasa">${escaparHtml(etiquetaTasa(tasa))}</span></span>`,
     );
     filas.push("</div>");
-
-    if (cantidad !== 1) {
-      filas.push(
-        `<div class="tk-item-sub">${escaparHtml(dinero(datos.moneda, unitario))} c/u</div>`,
-      );
-    }
 
     filas.push("</div>");
   }
 
   filas.push("</div>");
-  filas.push('<div class="tk-sep"></div>');
+
+  if (datos.items.length > 0) {
+    filas.push(
+      `<div class="tk-resumen-items">Ítems: ${datos.items.length} · Unidades: ${escaparHtml(
+        formatCantidad(unidades),
+      )}</div>`,
+    );
+  }
+
+  /* ── Totales ── */
+  filas.push('<div class="tk-sep-solido"></div>');
   filas.push('<div class="tk-totales">');
 
   if (configuracion.mostrarDesgloseIva) {
     if (esVerdadero(datos.subtotal)) {
       filas.push(total("Subtotal", dinero(datos.moneda, datos.subtotal)));
-    }
-    if (esVerdadero(datos.iva5)) {
-      filas.push(total("IVA 5 %", dinero(datos.moneda, datos.iva5)));
-    }
-    if (esVerdadero(datos.iva10)) {
-      filas.push(total("IVA 10 %", dinero(datos.moneda, datos.iva10)));
     }
     if (esVerdadero(datos.exenta)) {
       filas.push(total("Exenta", dinero(datos.moneda, datos.exenta)));
@@ -439,26 +587,48 @@ export function construirCuerpoTicket(
   );
   filas.push("</div>");
 
+  /* ── Liquidación del IVA ── */
+  if (
+    configuracion.mostrarDesgloseIva &&
+    (esVerdadero(datos.iva5) || esVerdadero(datos.iva10))
+  ) {
+    const totalIva = (Number(datos.iva5) || 0) + (Number(datos.iva10) || 0);
+    filas.push('<div class="tk-liquidacion">');
+    filas.push('<div class="tk-seccion">LIQUIDACIÓN DEL IVA</div>');
+    filas.push(total("IVA 5 %", dinero(datos.moneda, datos.iva5 ?? 0)));
+    filas.push(total("IVA 10 %", dinero(datos.moneda, datos.iva10 ?? 0)));
+    filas.push(
+      `<div class="tk-fila"><span class="tk-etiqueta">Total IVA</span><b>${escaparHtml(
+        dinero(datos.moneda, totalIva),
+      )}</b></div>`,
+    );
+    filas.push("</div>");
+  }
+
+  /* ── Pagos ── */
   if (configuracion.mostrarPagos && datos.pagos && datos.pagos.length > 0) {
     filas.push('<div class="tk-sep"></div>');
+    filas.push('<div class="tk-seccion">PAGOS</div>');
     for (const pago of datos.pagos) {
-      filas.push(
-        fila(
-          ETIQUETAS_METODO[pago.metodo] ?? pago.metodo,
-          dinero(datos.moneda, pago.monto),
-        ),
-      );
+      const metodo = ETIQUETAS_METODO[pago.metodo] ?? pago.metodo;
+      filas.push(fila(metodo, dinero(datos.moneda, pago.monto)));
+      const referencia = String(pago.referencia ?? "").trim();
+      if (referencia) {
+        filas.push(`<div class="tk-sub">Ref. ${escaparHtml(referencia)}</div>`);
+      }
     }
   }
 
+  /* ── Pie ── */
   if (configuracion.mensajePie.trim()) {
+    filas.push('<div class="tk-sep"></div>');
     filas.push(
       `<div class="tk-pie">${escaparHtml(configuracion.mensajePie.trim())}</div>`,
     );
   }
 
   if (esTicket) {
-    filas.push('<div class="tk-nota">Documento no válido como factura</div>');
+    filas.push('<div class="tk-nota">DOCUMENTO NO VÁLIDO COMO FACTURA</div>');
   }
 
   if (datos.estado === "ANULADA") {
@@ -482,12 +652,53 @@ export function tituloComprobante(datos: TicketVentaDatos): string {
   return "FACTURA DE VENTA";
 }
 
+/**
+ * Alícuota de la línea. Las ventas reales traen `porcentajeIva`; para datos de
+ * ejemplo o ventas viejas se deduce de los totales del comprobante.
+ */
+function tasaItem(item: TicketItemDatos, datos: TicketVentaDatos): 0 | 5 | 10 {
+  if (item.porcentajeIva !== null && item.porcentajeIva !== undefined) {
+    const valor = Number(item.porcentajeIva);
+    if (valor === 5) return 5;
+    if (valor === 10) return 10;
+    if (valor === 0) return 0;
+  }
+
+  const hayIva5 = esVerdadero(datos.iva5);
+  const hayIva10 = esVerdadero(datos.iva10);
+  const hayExenta = esVerdadero(datos.exenta);
+
+  if (hayExenta && !hayIva5 && !hayIva10) return 0;
+  if (hayIva5 && !hayIva10) return 5;
+  if (hayIva10) return 10;
+  return 0;
+}
+
+function etiquetaTasa(tasa: 0 | 5 | 10): string {
+  if (tasa === 5) return "(5%)";
+  if (tasa === 10) return "(10%)";
+  return "(Ex)";
+}
+
+function unirCliente(partes: (string | null | undefined)[]): string {
+  return partes
+    .map((parte) => String(parte ?? "").trim())
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function subcabeceraNegocio(organizacion: TicketOrganizacion): string[] {
   const lineas: string[] = [];
   if (organizacion.razonSocial && organizacion.razonSocial !== organizacion.nombre) {
     lineas.push(organizacion.razonSocial);
   }
   if (organizacion.ruc) lineas.push(`RUC ${organizacion.ruc}`);
+  if (organizacion.actividadEconomica) {
+    lineas.push(`Act. económica: ${organizacion.actividadEconomica}`);
+  }
+  if (organizacion.nombreRepresentante) {
+    lineas.push(`de ${organizacion.nombreRepresentante}`);
+  }
   if (organizacion.direccion) lineas.push(organizacion.direccion);
   if (organizacion.telefono) lineas.push(`Tel. ${organizacion.telefono}`);
   if (organizacion.email) lineas.push(organizacion.email);

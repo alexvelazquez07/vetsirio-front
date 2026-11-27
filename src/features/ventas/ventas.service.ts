@@ -114,6 +114,9 @@ export interface Venta {
     /** Nombre listo para mostrar, calculado por el backend. */
     nombreCompleto?: string;
     telefono?: string | null;
+    direccion?: string | null;
+    ciudad?: string | null;
+    departamento?: string | null;
   };
   usuario: { id: number; nombre: string; apellido: string };
   items?: VentaItem[];
