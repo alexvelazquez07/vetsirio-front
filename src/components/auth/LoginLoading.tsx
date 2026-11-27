@@ -1,6 +1,7 @@
 import { Box, chakra, Flex, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 
+import appIcon from "@/assets/img/08_app_icon_192x192.png";
 import { useSinMovimiento } from "@/lib/motion";
 
 /**
@@ -177,14 +178,22 @@ function Latido({ reduceMotion }: { reduceMotion: boolean }) {
           justify="center"
           w="full"
           h="full"
-          borderRadius="full"
-          bg="brand.500"
-          boxShadow="0 0 24px color-mix(in srgb, var(--chakra-colors-brand-500) 50%, transparent)"
           style={
             reduceMotion ? undefined : { animation: "vetsirio-latido 1.15s ease-in-out infinite" }
           }
         >
-          <PawPrint size={22} color="white" strokeWidth={2.2} />
+          <chakra.img
+            src={appIcon}
+            alt="VetSirio"
+            w="full"
+            h="full"
+            objectFit="contain"
+            draggable={false}
+            style={{
+              filter:
+                "drop-shadow(0 0 16px color-mix(in srgb, var(--chakra-colors-brand-500) 55%, transparent))",
+            }}
+          />
         </Flex>
       </Box>
 
@@ -218,34 +227,5 @@ function Latido({ reduceMotion }: { reduceMotion: boolean }) {
         />
       </chakra.svg>
     </Box>
-  );
-}
-
-/**
- * Huella de perro con los dedos desfasados.
- *
- * Lucide no tiene un ícono de huella con la forma que necesitamos, y usar un
- * paw genérico de otra librería suma una dependencia por un solo ícono.
- */
-function PawPrint({ size, color, strokeWidth }: { size: number; color: string; strokeWidth: number }) {
-  return (
-    <chakra.svg
-      width={`${size}px`}
-      height={`${size}px`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {/* Almohadillas de los dedos, en arco sobre la almohadilla principal. */}
-      <ellipse cx="6.2" cy="8.6" rx="1.9" ry="2.4" transform="rotate(-16 6.2 8.6)" />
-      <ellipse cx="10.4" cy="6.4" rx="1.9" ry="2.5" transform="rotate(-5 10.4 6.4)" />
-      <ellipse cx="15.1" cy="7.3" rx="1.9" ry="2.5" transform="rotate(9 15.1 7.3)" />
-      <ellipse cx="18.7" cy="10.4" rx="1.7" ry="2.2" transform="rotate(20 18.7 10.4)" />
-      <path d="M12.4 12.6c2.6 0 4.7 1.8 4.7 4.1 0 1.7-1.4 2.7-3.2 2.7-.7 0-1.1.2-1.5.2s-.8-.2-1.5-.2c-1.8 0-3.2-1-3.2-2.7 0-2.3 2.1-4.1 4.7-4.1Z" />
-    </chakra.svg>
   );
 }

@@ -2,7 +2,6 @@ import {
   Box,
   Button,
   chakra,
-  Container,
   Flex,
   Grid,
   Heading,
@@ -11,24 +10,15 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  ArrowRight,
-  CalendarCheck,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  HeartPulse,
-  Lock,
-  Mail,
-  Receipt,
-  ShieldCheck,
-} from "lucide-react";
+import { Eye, EyeOff, PawPrint } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
+import logoLoginMovil from "@/assets/img/02_VetSirio_logo_fondo_blanco.png";
+import logoLoginOscuro from "@/assets/img/06_logo_pantalla_login_transparente.png";
+import logoLoginClaro from "@/assets/img/06_logo_pantalla_login_transparente.png";
 import { LoginLoading } from "@/components/auth/LoginLoading";
-import { TextoRotativo } from "@/components/layout/TextoRotativo";
 import { Alert } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/features/auth/auth.store";
@@ -39,7 +29,7 @@ import {
 } from "@/features/auth/emailRecordado";
 import { loginSchema, type LoginForm } from "@/lib/validaciones";
 
-/** Frases que se escriben solas en el panel de marca. */
+/** Frases que rotan en el panel de marca. */
 const FRASES = [
   "Agenda que nunca se superpone",
   "Historia clínica de cada mascota",
@@ -49,41 +39,62 @@ const FRASES = [
   "Cuentas que cierran solas",
 ];
 
-/** Capacidades que se listan con entrada escalonada. */
-const CAPACIDADES = [
-  {
-    icono: CalendarCheck,
-    titulo: "Agenda sin superposiciones",
-    detalle: "Reservas por veterinario con control de horarios.",
-  },
-  {
-    icono: HeartPulse,
-    titulo: "Historial clínico completo",
-    detalle: "Consultas, vacunas y recetas en un solo lugar.",
-  },
-  {
-    icono: Receipt,
-    titulo: "Facturación al día",
-    detalle: "Tickets, cobros y cierre de caja sin planillas.",
-  },
-  {
-    icono: ShieldCheck,
-    titulo: "Cada clínica con sus datos",
-    detalle: "Aislamiento real entre veterinarias.",
-  },
+/** Huellas del recorrido animado: posición (%), giro (grados) y retardo (s). */
+const HUELLAS = [
+  { x: 8, y: 78, giro: 62, retardo: 0 },
+  { x: 24, y: 58, giro: 82, retardo: 0.7 },
+  { x: 40, y: 70, giro: 58, retardo: 1.4 },
+  { x: 56, y: 48, giro: 80, retardo: 2.1 },
+  { x: 72, y: 60, giro: 56, retardo: 2.8 },
+  { x: 88, y: 36, giro: 78, retardo: 3.5 },
 ];
 
+/** Azul noche con un leve tinte del color de marca hacia la esquina inferior. */
+const COLOR_FONDO_PANEL =
+  "linear-gradient(160deg, var(--chakra-colors-ink-950, #0b1220) 0%, var(--chakra-colors-ink-950, #0b1220) 45%, color-mix(in srgb, var(--chakra-colors-brand-500) 24%, var(--chakra-colors-ink-950, #0b1220)) 100%)";
+
+const anilloFoco =
+  "0 0 0 3px color-mix(in srgb, var(--chakra-colors-brand-500) 18%, transparent)";
+
 /**
- * Pantalla de acceso.
+ * Animaciones del login. Se definen aquí para que la pantalla sea autónoma y
+ * no dependa de keyframes globales. Todo es transform/opacity/stroke: no hay
+ * imágenes que descargar. Con "reducir movimiento" activado quedan estáticas.
+ */
+const ESTILOS_ANIMACION = `
+@keyframes vs-login-paso {
+  0%   { opacity: 0; transform: translateY(6px) rotate(var(--giro)) scale(.9); }
+  18%  { opacity: .55; transform: translateY(0) rotate(var(--giro)) scale(1); }
+  60%  { opacity: .55; }
+  100% { opacity: 0; transform: translateY(-4px) rotate(var(--giro)) scale(1); }
+}
+@keyframes vs-login-latido {
+  0%   { stroke-dashoffset: 100; }
+  55%  { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -100; }
+}
+@keyframes vs-login-fundido {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes vs-login-flotar {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(2rem, 1.5rem, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-login-anim { animation: none !important; }
+  .vs-login-huella { opacity: .28 !important; }
+}
+`;
+
+/**
+ * Pantalla de acceso, versión minimalista con panel lateral.
  *
- * Layout en dos columnas: panel de marca a la izquierda y formulario a la
- * derecha. En móvil se apila y sólo queda el formulario, porque lo primero que
- * necesita alguien que quiere entrar es poder escribir su contraseña sin
- * desplazamiento.
+ * Panel de marca oscuro a la izquierda (una frase que rota, un recorrido de
+ * huellas y una línea de latido) y formulario sin adornos a la derecha. En
+ * pantallas chicas el panel desaparece y el logo pasa encima del título.
  *
- * Las columnas se definen con un grid de `1fr 34rem` en lugar de dos cajas
- * `flex: 1`. Con flex, el límite de ancho del formulario deja un hueco vacío a
- * la derecha en pantallas anchas; con grid, el formulario queda pegado al borde
+ * Las columnas usan grid `1fr 34rem`: el formulario queda pegado al borde
  * derecho y el panel ocupa exactamente el resto.
  */
 export function LoginPage() {
@@ -135,16 +146,14 @@ export function LoginPage() {
         olvidarEmailRecordado();
       }
       // Si el login funciona, `login` navega al inicio y este componente se
-      // desmonta. La capa sigue montada durante la transición para que no se
-      // vea el parpadeo del formulario vacío mientras carga el dashboard.
+      // desmonta. La capa de carga sigue montada durante la transición para
+      // que no se vea el parpadeo del formulario mientras carga el dashboard.
     } catch (error) {
       setErrorGeneral(
         error instanceof Error
           ? error.message
           : "No pudimos iniciar sesión. Intentá de nuevo.",
       );
-      // Sólo se baja la capa si falló: si el login fue exitoso, la pantalla
-      // ya está cambiando y bajarla mostraría el formulario un instante.
       setEnviando(false);
     }
   });
@@ -160,9 +169,10 @@ export function LoginPage() {
   return (
     <Grid
       minH="100dvh"
-      bg="ink.50"
       templateColumns={{ base: "1fr", lg: "minmax(0, 1fr) 34rem" }}
     >
+      <style>{ESTILOS_ANIMACION}</style>
+
       {/* ── Panel de marca (izquierda) ─────────────────────────────── */}
       <PanelMarca />
 
@@ -170,38 +180,48 @@ export function LoginPage() {
       <Flex
         direction="column"
         justify="center"
-        px={{ base: "5", md: "10", xl: "12" }}
+        px={{ base: "6", md: "10", xl: "12" }}
         py={{ base: "8", md: "12" }}
         bg="white"
-        borderLeftWidth={{ lg: "1px" }}
-        borderColor="ink.200"
       >
-        <Container maxW="25rem" p="0">
-          <Box display={{ base: "block", lg: "none" }}>
-            <Logo />
+        <Box w="full" maxW="24rem" mx="auto">
+          {/* En escritorio la marca vive en el panel; aquí sólo en pantallas
+              chicas, cuando el panel lateral desaparece. La imagen original es
+              grande: se limita el ancho en pantalla y la altura se calcula sola
+              para no deformarla. */}
+          <Box display={{ base: "block", lg: "none" }} mb="8">
+            <chakra.img
+              src={logoLoginMovil}
+              alt="VetSirio — gestión veterinaria"
+              display="block"
+              w="full"
+              maxW={{ base: "12rem", md: "23rem" }}
+              h="auto"
+              decoding="async"
+              draggable={false}
+              userSelect="none"
+            />
           </Box>
 
           <Heading
             as="h1"
-            fontSize={{ base: "2xl", md: "3xl" }}
-            fontWeight="bold"
+            fontSize="2xl"
+            fontWeight="semibold"
             color="ink.900"
-            mt={{ base: "8", lg: "0" }}
             letterSpacing="-0.02em"
           >
-            Iniciar Sesión
+            Iniciar sesión
           </Heading>
 
-          <Text color="ink.600" mt="2">
-            Ingresá con el correo con el que registraste tu veterinaria.
+          <Text color="ink.500" mt="1.5" fontSize="sm">
+            Ingresá con el correo de tu veterinaria.
           </Text>
 
           {registrado && !errorGeneral && (
             <Alert status="success" rounded="md" mt="5" title="¡Cuenta creada!">
               {emailRecordado ? (
                 <>
-                  Ya podés ingresar con <b>{emailRecordado}</b>. Te dejamos el
-                  correo cargado.
+                  Ya podés ingresar con <b>{emailRecordado}</b>.
                 </>
               ) : (
                 "Ya podés iniciar sesión."
@@ -211,7 +231,7 @@ export function LoginPage() {
 
           {sesionExpirada && !errorGeneral && (
             <Alert status="warning" rounded="md" mt="5">
-              Tu sesión venció o expiró. Iniciá sesión nuevamente.
+              Tu sesión venció. Iniciá sesión nuevamente.
             </Alert>
           )}
 
@@ -227,54 +247,42 @@ export function LoginPage() {
             </Alert>
           )}
 
-          <chakra.form onSubmit={enviar} mt="6" noValidate>
-            <Campo
-              id="email"
-              label="Correo electrónico"
-              error={errors.email?.message}
-              icono={<Mail size={17} />}
-            >
+          <chakra.form onSubmit={enviar} mt="7" noValidate>
+            <Campo id="email" label="Correo electrónico" error={errors.email?.message}>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
                 inputMode="email"
                 placeholder="tu@veterinaria.com"
-                pl="10"
                 h="11"
                 borderColor={errors.email ? "danger.500" : "ink.200"}
+                _hover={{ borderColor: errors.email ? "danger.500" : "ink.300" }}
                 _focusVisible={{
                   borderColor: errors.email ? "danger.500" : "brand.500",
-                  boxShadow:
-                    "0 0 0 3px color-mix(in srgb, var(--chakra-colors-brand-500) 22%, transparent)",
+                  boxShadow: anilloFoco,
                 }}
                 {...register("email")}
               />
             </Campo>
 
-            <Campo
-              id="password"
-              label="Contraseña"
-              error={errors.password?.message}
-              icono={<Lock size={17} />}
-            >
+            <Campo id="password" label="Contraseña" error={errors.password?.message}>
               <Box position="relative">
                 <Input
                   id="password"
                   type={mostrarPassword ? "text" : "password"}
                   autoComplete="current-password"
                   // Al volver del registro el correo ya está cargado, así que
-                  // el foco arranca donde de verdad hace falta: la clave.
+                  // el foco arranca donde de verdad hace falta: la contraseña.
                   autoFocus={registrado && emailRecordado.length > 0}
                   placeholder="Tu contraseña"
-                  pl="10"
-                  pr="11"
                   h="11"
+                  pr="11"
                   borderColor={errors.password ? "danger.500" : "ink.200"}
+                  _hover={{ borderColor: errors.password ? "danger.500" : "ink.300" }}
                   _focusVisible={{
                     borderColor: errors.password ? "danger.500" : "brand.500",
-                    boxShadow:
-                      "0 0 0 3px color-mix(in srgb, var(--chakra-colors-brand-500) 22%, transparent)",
+                    boxShadow: anilloFoco,
                   }}
                   {...register("password")}
                 />
@@ -288,8 +296,8 @@ export function LoginPage() {
                   transform="translateY(-50%)"
                   p="1.5"
                   borderRadius="md"
-                  color="ink.500"
-                  _hover={{ bg: "ink.100", color: "ink.800" }}
+                  color="ink.400"
+                  _hover={{ color: "ink.800" }}
                   aria-label={
                     mostrarPassword ? "Ocultar contraseña" : "Mostrar contraseña"
                   }
@@ -315,15 +323,16 @@ export function LoginPage() {
                   setRecordarEmail(detalle.checked === true)
                 }
               >
-                Recordar mi correo
+                <Text fontSize="sm" color="ink.600">
+                  Recordarme
+                </Text>
               </Checkbox>
 
               <Link to="/recuperar-password">
                 <Text
                   fontSize="sm"
-                  color="brand.700"
-                  fontWeight="medium"
-                  _hover={{ textDecoration: "underline" }}
+                  color="ink.600"
+                  _hover={{ color: "brand.700", textDecoration: "underline" }}
                 >
                   ¿Olvidaste tu contraseña?
                 </Text>
@@ -337,7 +346,7 @@ export function LoginPage() {
               bg="brand.500"
               color="white"
               fontWeight="semibold"
-              borderRadius="md"
+              borderRadius="lg"
               disabled={isSubmitting}
               _hover={{ bg: "brand.600" }}
               _active={{ bg: "brand.700" }}
@@ -348,40 +357,28 @@ export function LoginPage() {
                   <Text>Ingresando…</Text>
                 </Flex>
               ) : (
-                <Flex align="center" justify="center" gap="2">
-                  <Text>Ingresar</Text>
-                  <ArrowRight size={17} />
-                </Flex>
+                "Ingresar"
               )}
             </Button>
           </chakra.form>
 
-          <Flex align="center" gap="3" my="6">
-            <Box flex="1" h="1px" bg="ink.200" />
-            <Text fontSize="xs" color="ink.400">
-              o
-            </Text>
-            <Box flex="1" h="1px" bg="ink.200" />
-          </Flex>
-
-          <Link to="/registro">
-            <Button
-              variant="outline"
-              w="full"
-              h="11"
-              borderColor="ink.300"
-              color="ink.800"
-              fontWeight="semibold"
-              _hover={{ bg: "ink.50", borderColor: "brand.400", color: "brand.700" }}
-            >
-              Crear cuenta de una veterinaria
-            </Button>
-          </Link>
-
-          <Text textAlign="center" color="ink.500" mt="4" fontSize="xs">
-            Período de prueba gratuito.
+          <Text textAlign="center" color="ink.500" mt="7" fontSize="sm">
+            ¿Todavía no tenés cuenta?{" "}
+            <Link to="/registro">
+              <chakra.span
+                color="brand.700"
+                fontWeight="semibold"
+                _hover={{ textDecoration: "underline" }}
+              >
+                Registrá tu veterinaria
+              </chakra.span>
+            </Link>
           </Text>
-        </Container>
+
+          <Text textAlign="center" color="ink.400" mt="3" fontSize="xs">
+            Período de prueba gratuito
+          </Text>
+        </Box>
       </Flex>
 
       {/* Capa de carga. Se queda montada si el login fue exitoso, mientras el
@@ -394,9 +391,9 @@ export function LoginPage() {
 /**
  * Panel de marca.
  *
- * Todo lo decorativo va con gradientes CSS y animaciones de transformación:
- * pesa cero bytes contra una imagen de fondo, que es lo que de verdad hace
- * lenta una landing.
+ * Fondo oscuro (azul noche con un tinte del color de marca). Tres elementos, todos
+ * animados con CSS puro: frase rotativa, recorrido de huellas y línea de
+ * latido. Es decorativo, por eso va oculto a lectores de pantalla.
  */
 function PanelMarca() {
   return (
@@ -404,232 +401,209 @@ function PanelMarca() {
       display={{ base: "none", lg: "block" }}
       position="relative"
       overflow="hidden"
-      bg="ink.950"
+      style={{ background: COLOR_FONDO_PANEL }}
     >
-      {/* Orbes de color: dan profundidad sin una sola imagen. */}
+      {/* Mancha de color muy suave que deriva despacio. */}
       <Box
-        position="absolute"
-        inset="0"
-        overflow="hidden"
+        className="vs-login-anim"
         aria-hidden="true"
-      >
-        <Box
-          position="absolute"
-          top="-18%"
-          left="-12%"
-          w="38rem"
-          h="38rem"
-          borderRadius="full"
-          bg="brand.600"
-          opacity="0.32"
-          filter="blur(90px)"
-          animation="vetsirio-deriva 18s ease-in-out infinite"
-        />
-        <Box
-          position="absolute"
-          bottom="-22%"
-          right="-10%"
-          w="32rem"
-          h="32rem"
-          borderRadius="full"
-          bg="brand.400"
-          opacity="0.2"
-          filter="blur(100px)"
-          animation="vetsirio-deriva 22s ease-in-out infinite reverse"
-        />
-        <Box
-          position="absolute"
-          top="42%"
-          right="18%"
-          w="18rem"
-          h="18rem"
-          borderRadius="full"
-          bg="brand.300"
-          opacity="0.14"
-          filter="blur(70px)"
-          animation="vetsirio-deriva 26s ease-in-out infinite"
-        />
-      </Box>
+        position="absolute"
+        top="-14%"
+        right="-10%"
+        w="34rem"
+        h="34rem"
+        borderRadius="full"
+        bg="brand.500"
+        opacity="0.26"
+        filter="blur(100px)"
+        style={{ animation: "vs-login-flotar 24s ease-in-out infinite" }}
+      />
 
-      {/* Grilla sutil: da textura sin distraer. */}
+      {/* Grilla muy tenue que se desvanece hacia los bordes. */}
       <Box
+        aria-hidden="true"
         position="absolute"
         inset="0"
-        opacity="0.16"
-        aria-hidden="true"
-        backgroundImage={`linear-gradient(rgba(255,255,255,.09) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(255,255,255,.09) 1px, transparent 1px)`}
-        backgroundSize="52px 52px"
-        // Máscara radial: la grilla se desvanece hacia los bordes para que
-        // se vea como textura de fondo y no como una cuadrícula de Excel.
-        maskImage="radial-gradient(ellipse 80% 70% at 50% 40%, black 40%, transparent 100%)"
-        WebkitMaskImage="radial-gradient(ellipse 80% 70% at 50% 40%, black 40%, transparent 100%)"
+        opacity="0.07"
+        backgroundImage={`linear-gradient(#fff 1px, transparent 1px),
+                          linear-gradient(90deg, #fff 1px, transparent 1px)`}
+        backgroundSize="56px 56px"
+        maskImage="radial-gradient(ellipse 75% 65% at 40% 45%, black 35%, transparent 100%)"
+        WebkitMaskImage="radial-gradient(ellipse 75% 65% at 40% 45%, black 35%, transparent 100%)"
       />
 
       <Flex
         position="relative"
         direction="column"
-        justify="center"
         h="100%"
         px={{ lg: "12", xl: "16" }}
-        py="14"
-        color="white"
+        py="12"
       >
-        {/* Marca */}
-        <Flex align="center" gap="3" mb="12">
-          <Flex
-            align="center"
-            justify="center"
-            w="10"
-            h="10"
-            borderRadius="lg"
-            bg="brand.500"
+        <Marca oscuro />
+
+        <Flex direction="column" justify="center" flex="1" py="10">
+          <Text
+            fontSize="xs"
             fontWeight="bold"
-            boxShadow="0 6px 20px color-mix(in srgb, var(--chakra-colors-brand-500) 45%, transparent)"
+            textTransform="uppercase"
+            letterSpacing="0.16em"
+            color="brand.300"
+            mb="4"
           >
-            VS
-          </Flex>
-          <Box>
-            <Text fontWeight="bold" fontSize="lg" lineHeight="1.1">
-              VetSirio
-            </Text>
-            <Text fontSize="xs" color="brand.200">
-              Software para veterinarias
-            </Text>
-          </Box>
+            Gestión veterinaria
+          </Text>
+
+          <FraseRotativa />
+
+          <Text color="ink.300" mt="4" maxW="26rem" lineHeight="1.65">
+            Agenda, historia clínica, inventario y facturación en un solo lugar,
+            con los datos de tu veterinaria aislados de los demás.
+          </Text>
+
+          <RecorridoHuellas />
         </Flex>
 
-        <Text
-          fontSize="xs"
-          fontWeight="bold"
-          textTransform="uppercase"
-          letterSpacing="0.16em"
-          color="brand.300"
-          mb="4"
-        >
-          Gestión veterinaria
-        </Text>
-
-        {/* Frase rotativa */}
-        <Box maxW="26rem" mb="6">
-          <TextoRotativo frases={FRASES} />
+        <Box aria-hidden="true">
+          <LineaLatido />
+          <Text color="ink.400" fontSize="xs" mt="3">
+            Agenda · Historia clínica · Inventario · Facturación
+          </Text>
         </Box>
-
-        <Text mt="2" color="ink.200" fontSize={{ lg: "md", xl: "lg" }} lineHeight="1.65" maxW="28rem">
-          Agenda, historia clínica, inventario y facturación, con los datos de tu
-          veterinaria aislados de los demás.
-        </Text>
-
-        {/* Capacidades con entrada escalonada: aparecen una tras otra al cargar,
-            no todas de golpe, que es lo que hace que una pantalla se sienta
-            estática. */}
-        <Grid gap="5" mt="12">
-          {CAPACIDADES.map((capacidad, indice) => (
-            <Flex
-              key={capacidad.titulo}
-              gap="3.5"
-              align="flex-start"
-              style={{
-                animation: `vetsirio-entrada 520ms cubic-bezier(0.22, 1, 0.36, 1) ${indice * 110 + 180}ms both`,
-              }}
-            >
-              <Flex
-                align="center"
-                justify="center"
-                w="9"
-                h="9"
-                borderRadius="md"
-                bg="whiteAlpha.100"
-                borderWidth="1px"
-                borderColor="whiteAlpha.200"
-                color="brand.200"
-                flexShrink={0}
-              >
-                <capacidad.icono size={17} />
-              </Flex>
-              <Box>
-                <Text fontWeight="semibold" fontSize="sm">
-                  {capacidad.titulo}
-                </Text>
-                <Text fontSize="xs" color="ink.300" mt="0.5" lineHeight="1.55">
-                  {capacidad.detalle}
-                </Text>
-              </Box>
-            </Flex>
-          ))}
-        </Grid>
-
-        {/* Pie con sello de seguridad */}
-        <Flex
-          align="center"
-          gap="2.5"
-          mt="12"
-          pt="6"
-          borderTopWidth="1px"
-          borderColor="whiteAlpha.150"
-          wrap="wrap"
-        >
-    
-          <Flex align="center" gap="2">
-            <CheckCircle2 size={14} color="var(--chakra-colors-brand-300)" />
-            <Text fontSize="xs" color="ink.300">
-              Datos aislados por veterinaria
-            </Text>
-          </Flex>
-
-          <Flex align="center" gap="2">
-            <Lock size={14} color="var(--chakra-colors-brand-300)" />
-            <Text fontSize="xs" color="ink.300">
-              Contraseñas cifradas 
-            </Text>
-          </Flex>
-        </Flex>
       </Flex>
     </Box>
   );
 }
 
-function Logo() {
+/** Frase grande que cambia cada pocos segundos con un fundido suave. */
+function FraseRotativa() {
+  const [indice, setIndice] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setIndice((previo) => (previo + 1) % FRASES.length),
+      3800,
+    );
+    return () => window.clearInterval(id);
+  }, []);
+
   return (
-    <Flex align="center" gap="3">
-      <Flex
-        align="center"
-        justify="center"
-        w="11"
-        h="11"
-        borderRadius="lg"
-        bg="brand.500"
-        color="white"
-        fontWeight="bold"
-        fontSize="lg"
-        boxShadow="0 6px 16px color-mix(in srgb, var(--chakra-colors-brand-500) 35%, transparent)"
-      >
-        VS
-      </Flex>
-      <Box>
-        <Text fontWeight="bold" fontSize="lg" color="ink.900" lineHeight="1.1">
-          VetSirio
-        </Text>
-        <Text fontSize="xs" color="ink.500">
-          Software para veterinarias
-        </Text>
-      </Box>
-    </Flex>
+    <Heading
+      key={indice}
+      className="vs-login-anim"
+      as="h2"
+      fontSize={{ lg: "3xl", xl: "4xl" }}
+      fontWeight="semibold"
+      color="white"
+      lineHeight="1.15"
+      letterSpacing="-0.025em"
+      maxW="28rem"
+      minH="2.4em"
+      style={{ animation: "vs-login-fundido 650ms cubic-bezier(0.22, 1, 0.36, 1) both" }}
+    >
+      {FRASES[indice]}
+    </Heading>
   );
 }
 
-/** Campo con etiqueta, icono y error. Unifica los tres estados del input. */
+/** Huellas que aparecen una tras otra, como si una mascota cruzara la pantalla. */
+function RecorridoHuellas() {
+  return (
+    <Box
+      aria-hidden="true"
+      position="relative"
+      w="100%"
+      maxW="30rem"
+      h="9rem"
+      mt="8"
+    >
+      {HUELLAS.map((huella, indice) => (
+        <Box
+          key={indice}
+          className="vs-login-huella vs-login-anim"
+          position="absolute"
+          left={`${huella.x}%`}
+          top={`${huella.y}%`}
+          color="brand.300"
+          opacity="0"
+          style={
+            {
+              "--giro": `${huella.giro}deg`,
+              animation: `vs-login-paso 4.2s ease-in-out ${huella.retardo}s infinite`,
+            } as React.CSSProperties
+          }
+        >
+          <PawPrint size={26} strokeWidth={1.75} />
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/** Línea de electrocardiograma que se dibuja y se desvanece en bucle. */
+function LineaLatido() {
+  const trazo = "M0 30 H120 L134 30 L144 8 L158 52 L170 18 L180 30 H400";
+
+  return (
+    <chakra.svg
+      viewBox="0 0 400 60"
+      w="100%"
+      maxW="26rem"
+      h="auto"
+      fill="none"
+      color="brand.300"
+    >
+      <path
+        d={trazo}
+        stroke="currentColor"
+        strokeOpacity="0.14"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="vs-login-anim"
+        d={trazo}
+        pathLength={100}
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray="100"
+        style={{ animation: "vs-login-latido 3.6s linear infinite" }}
+      />
+    </chakra.svg>
+  );
+}
+
+/**
+ * Logo del producto. Se muestra con su tamaño original, sin escalarlo ni
+ * recortarlo. `alignSelf="flex-start"` evita que el contenedor flex en
+ * columna lo estire a todo el ancho del panel.
+ */
+function Marca({ oscuro = false }: { oscuro?: boolean }) {
+  return (
+    <chakra.img
+      src={oscuro ? logoLoginOscuro : logoLoginClaro}
+      alt="VetSirio — gestión veterinaria"
+      display="block"
+      alignSelf="flex-start"
+      maxW="100%"
+      draggable={false}
+      userSelect="none"
+    />
+  );
+}
+
+/** Campo con etiqueta y mensaje de error. */
 function Campo({
   id,
   label,
   error,
-  icono,
   children,
 }: {
   id: string;
   label: string;
   error?: string;
-  icono: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -638,30 +612,17 @@ function Campo({
         htmlFor={id}
         fontSize="sm"
         fontWeight="medium"
-        color="ink.800"
+        color="ink.700"
         mb="1.5"
         display="block"
       >
         {label}
       </chakra.label>
 
-      <Box position="relative">
-        <Box
-          position="absolute"
-          left="3"
-          top="50%"
-          transform="translateY(-50%)"
-          color={error ? "danger.500" : "ink.400"}
-          pointerEvents="none"
-          zIndex="1"
-        >
-          {icono}
-        </Box>
-        {children}
-      </Box>
+      {children}
 
       {error && (
-        <Text fontSize="xs" color="danger.600" mt="1.5" fontWeight="medium">
+        <Text fontSize="xs" color="danger.600" mt="1.5">
           {error}
         </Text>
       )}

@@ -26,6 +26,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Alert } from "@/components/ui/alert";
 import { ApiError, http } from "@/services/api";
 import { nuevaPasswordSchema } from "@/lib/validaciones";
+import logoVetSirio from "@/assets/img/02_VetSirio_logo_fondo_blanco.png";
 
 type Formulario = {
   password: string;
@@ -130,30 +131,30 @@ export function RestablecerPasswordPage() {
   return (
     <Flex minH="100dvh" bg="ink.50" align="center" py="10" px="5">
       <Container maxW="26rem" p="0">
-        <Flex justify="center" mb="7">
-          <Flex
-            align="center"
-            justify="center"
-            w="11"
-            h="11"
-            borderRadius="lg"
-            bg="brand.500"
-            color="white"
-            fontWeight="bold"
-            fontSize="lg"
-          >
-            VS
-          </Flex>
-        </Flex>
-
-        <Box
+         <Box
           bg="white"
-          borderRadius="lg"
+          borderRadius="2xl"
           borderWidth="1px"
           borderColor="ink.200"
-          boxShadow="sm"
-          p={{ base: "6", md: "7" }}
+          px={{ base: "6", md: "8" }}
+          py={{ base: "7", md: "9" }}
         >
+          {/* Logo con fondo blanco: se funde con la tarjeta, que también es
+                        blanca. La imagen original es grande, así que se limita el ancho y
+                        la altura se calcula sola para no deformarla. */}
+          <chakra.img
+            src={logoVetSirio}
+            alt="VetSirio — gestión veterinaria"
+            display="block"
+            w="full"
+            maxW="21rem"
+            h="auto"
+            mx="auto"
+            mb="7"
+            decoding="async"
+            draggable={false}
+            userSelect="none"
+          />
           {estado === "validando" && (
             <Flex direction="column" align="center" py="8" gap="4">
               <Spinner size="lg" color="brand.500" />

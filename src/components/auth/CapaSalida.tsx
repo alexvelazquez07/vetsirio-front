@@ -1,7 +1,8 @@
-import { Box, Flex, Text } from "@chakra-ui/react";
-import { LogOut, PawPrint } from "lucide-react";
+import { Box, chakra, Flex, Text } from "@chakra-ui/react";
+import { LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import appIcon from "@/assets/img/08_app_icon_192x192.png";
 import { useSinMovimiento } from "@/lib/motion";
 
 /**
@@ -114,17 +115,24 @@ export function CapaSalida() {
           justify="center"
           w="4rem"
           h="4rem"
-          borderRadius="full"
-          bg="brand.500"
-          color="white"
-          boxShadow="0 0 32px color-mix(in srgb, var(--chakra-colors-brand-500) 45%, transparent)"
           style={
             sinMovimiento
               ? undefined
               : { animation: "vetsirio-latido 2.6s ease-in-out infinite" }
           }
         >
-          <PawPrint size={26} strokeWidth={2.2} />
+          <chakra.img
+            src={appIcon}
+            alt="VetSirio"
+            w="full"
+            h="full"
+            objectFit="contain"
+            draggable={false}
+            style={{
+              filter:
+                "drop-shadow(0 0 20px color-mix(in srgb, var(--chakra-colors-brand-500) 60%, transparent))",
+            }}
+          />
         </Flex>
 
         {/* El `key` en el texto hace que React lo remonte en cada cambio, y con
